@@ -1,299 +1,162 @@
-// include/TuxArena/InputManager.h
-#pragma once
+#ifndef TUXARENA_INPUTMANAGER_H
+#define TUXARENA_INPUTMANAGER_H
 
-#include <string>
-#include <vector>
+#include <SDL2/SDL.h>
 #include <map>
-#include <set> // To track current/previous states efficiently
-
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL_keycode.h"
-#include "SDL3/SDL_gamepad.h"
-#include "SDL3/SDL_mouse.h"
+#include <set>
+#include <string>
 
 namespace TuxArena {
 
-// Define the possible game actions that can be mapped to input
-// Add more actions as needed (reload, use item, next/prev weapon, etc.)
 enum class GameAction {
-    UNKNOWN, // Default/unassigned
+    // Movement
     MOVE_FORWARD,
     MOVE_BACKWARD,
-    MOVE_LEFT,
-    MOVE_RIGHT,
-    SHOOT,
-    ALT_SHOOT, // e.g., secondary fire
+    STRAFE_LEFT,
+    STRAFE_RIGHT,
+    TURN_LEFT,      // For keyboard-only turning
+    TURN_RIGHT,     // For keyboard-only turning
+    JUMP,
     SPRINT,
-    JUMP, // If applicable
+
+    // Combat
+    FIRE_PRIMARY,
+    FIRE_SECONDARY,
+    RELOAD,
+    NEXT_WEAPON,
+    PREVIOUS_WEAPON,
+
+    // Weapon Slots
+    WEAPON_SLOT_1,
+    WEAPON_SLOT_2,
+    WEAPON_SLOT_3,
+    WEAPON_SLOT_4,
+    WEAPON_SLOT_5,
+    WEAPON_SLOT_6,
+    WEAPON_SLOT_7,
+    WEAPON_SLOT_8,
+    WEAPON_SLOT_9,
+
+    // UI / Game
     INTERACT,
     SHOW_SCORES,
     PAUSE_MENU,
-    // Add more...
+    PAUSE, // Added PAUSE action
+
+    // Mouse specific (usually not bound directly, but useful for state checking)
+    LOOK_UP,
+    LOOK_DOWN,
+    LOOK_LEFT,
+    LOOK_RIGHT,
+
+    // Gamepad specific
+    GAMEPAD_LOOK_UP,
+    GAMEPAD_LOOK_DOWN,
+    GAMEPAD_LOOK_LEFT,
+    GAMEPAD_LOOK_RIGHT,
 };
 
-// Structure to hold mouse state
+
+// Struct to hold mouse state
 struct MouseState {
     float x = 0.0f;
     float y = 0.0f;
     float deltaX = 0.0f;
     float deltaY = 0.0f;
-    float scrollX = 0.0f; // Horizontal scroll
-    float scrollY = 0.0f; // Vertical scroll
-    std::set<Uint8> currentButtons; // Set of currently pressed buttons (SDL_BUTTON_LEFT, etc.)
-    std::set<Uint8> justPressedButtons;
-    std::set<Uint8> justReleasedButtons;
+    float scrollX = 0.0f;
+    float scrollY = 0.0f;
+    std::set<uint8_t> currentButtons;
+    std::set<uint8_t> justPressedButtons;
+    std::set<uint8_t> justReleasedButtons;
 };
 
-// Structure to hold gamepad state (for a single gamepad)
-// Expand later to support multiple gamepads if needed
+// Struct to hold gamepad state
 struct GamepadState {
-    SDL_Gamepad* instance = nullptr;
+    SDL_GameController* instance = nullptr;
     SDL_JoystickID instanceId = 0;
-    std::map<SDL_GamepadButton, bool> currentButtons; // Map of button enum -> pressed state
-    std::map<SDL_GamepadButton, bool> justPressedButtons;
-    std::map<SDL_GamepadButton, bool> justReleasedButtons;
-    std::map<SDL_GamepadAxis, float> axisValues; // Map of axis enum -> value (-1.0 to 1.0 after normalization)
     bool isConnected = false;
-    float triggerLeft = 0.0f; // Normalized trigger value (0.0 to 1.0)
+    std::map<SDL_GameControllerButton, bool> currentButtons;
+    std::map<SDL_GameControllerButton, bool> justPressedButtons;
+    std::map<SDL_GameControllerButton, bool> justReleasedButtons;
+    std::map<SDL_GameControllerAxis, float> axisValues;
+    float triggerLeft = 0.0f;
     float triggerRight = 0.0f;
 };
-
 
 class InputManager {
 public:
     InputManager();
     ~InputManager();
 
-    // Prevent copying
-    InputManager(const InputManager&) = delete;
-    InputManager& operator=(const InputManager&) = delete;
+    void processSDLEvent(SDL_Event& event);
+    void updateActionStates();
+    void clearTransientStates();
 
-    /**
-     * @brief Processes the SDL event queue, updating internal input states.
-     * Should be called once per frame before checking input states.
-     */
-    void pollEvents();
-
-    // --- Action Mapping Queries ---
-
-    /**
-     * @brief Checks if a specific game action is currently active (key/button held).
-     * @param action The game action to query.
-     * @return True if the action is active, false otherwise.
-     */
     bool isActionPressed(GameAction action) const;
-
-    /**
-     * @brief Checks if a specific game action was activated in the current frame.
-     * @param action The game action to query.
-     * @return True if the action was just activated, false otherwise.
-     */
     bool isActionJustPressed(GameAction action) const;
-
-    /**
-     * @brief Checks if a specific game action was deactivated in the current frame.
-     * @param action The game action to query.
-     * @return True if the action was just deactivated, false otherwise.
-     */
     bool isActionJustReleased(GameAction action) const;
 
-    // --- Direct State Queries ---
-
-    /**
-     * @brief Gets the current mouse position.
-     * @param x Output parameter for the x-coordinate.
-     * @param y Output parameter for the y-coordinate.
-     */
+    // Mouse input
     void getMousePosition(float& x, float& y) const;
-
-     /**
-      * @brief Gets the mouse movement since the last call to pollEvents().
-      * @param dx Output parameter for the change in x.
-      * @param dy Output parameter for the change in y.
-      */
     void getMouseDelta(float& dx, float& dy) const;
-
-     /**
-      * @brief Gets the mouse wheel scroll amount since the last call to pollEvents().
-      * @param dx Output parameter for the horizontal scroll amount.
-      * @param dy Output parameter for the vertical scroll amount.
-      */
     void getMouseScrollDelta(float& dx, float& dy) const;
+    bool isMouseButtonPressed(uint8_t button) const;
+    bool isMouseButtonJustPressed(uint8_t button) const;
+    bool isMouseButtonJustReleased(uint8_t button) const;
 
-     /**
-      * @brief Checks if a specific mouse button is currently held down.
-      * @param button SDL button index (e.g., SDL_BUTTON_LEFT).
-      * @return True if the button is pressed.
-      */
-     bool isMouseButtonPressed(Uint8 button) const;
-
-     /**
-      * @brief Checks if a specific mouse button was pressed this frame.
-      * @param button SDL button index.
-      * @return True if the button was just pressed.
-      */
-     bool isMouseButtonJustPressed(Uint8 button) const;
-
-      /**
-       * @brief Checks if a specific mouse button was released this frame.
-       * @param button SDL button index.
-       * @return True if the button was just released.
-       */
-      bool isMouseButtonJustReleased(Uint8 button) const;
-
-
-    /**
-     * @brief Checks if a specific keyboard key is currently held down.
-     * @param key The SDL_Keycode representing the key.
-     * @return True if the key is pressed.
-     */
+    // Keyboard input
     bool isKeyPressed(SDL_Keycode key) const;
-
-     /**
-      * @brief Checks if a specific keyboard key was pressed this frame.
-      * @param key The SDL_Keycode representing the key.
-      * @return True if the key was just pressed.
-      */
     bool isKeyJustPressed(SDL_Keycode key) const;
-
-      /**
-       * @brief Checks if a specific keyboard key was released this frame.
-       * @param key The SDL_Keycode representing the key.
-       * @return True if the key was just released.
-       */
     bool isKeyJustReleased(SDL_Keycode key) const;
 
-    /**
-     * @brief Checks if a quit event (e.g., closing the window) has been requested.
-     * @return True if a quit event occurred, false otherwise.
-     */
-    bool quitRequested() const { return m_quitRequested; }
-
-    // --- Binding Configuration ---
-
-    /**
-     * @brief Loads input bindings from a configuration file (Not implemented yet).
-     * @param filePath Path to the bindings configuration file.
-     * @return True if loading was successful, false otherwise.
-     */
-    bool loadBindings(const std::string& filePath);
-
-    /**
-     * @brief Binds a keyboard key to a game action.
-     * @param key The SDL_Keycode to bind.
-     * @param action The GameAction to trigger.
-     */
-    void bindKey(SDL_Keycode key, GameAction action);
-
-    /**
-     * @brief Binds a mouse button to a game action.
-     * @param button The SDL mouse button index (e.g., SDL_BUTTON_LEFT).
-     * @param action The GameAction to trigger.
-     */
-    void bindMouseButton(Uint8 button, GameAction action);
-
-    /**
-    * @brief Binds a gamepad button to a game action.
-    * @param button The SDL_GamepadButton to bind.
-    * @param action The GameAction to trigger.
-    */
-    void bindGamepadButton(SDL_GamepadButton button, GameAction action);
-
-    /**
-    * @brief Unbinds a keyboard key.
-    * @param key The SDL_Keycode to unbind.
-    */
-    void unbindKey(SDL_Keycode key);
-    // Add unbindMouseButton, unbindGamepadButton similarly...
-
-    // --- Gamepad Specific ---
-    /**
-     * @brief Gets the current value of a gamepad axis.
-     * @param axis The SDL_GamepadAxis to query.
-     * @param deadZone The threshold below which the axis value is treated as zero (range 0.0 to 1.0).
-     * @return The axis value, normalized between -1.0 and 1.0 (or 0.0 if within deadzone). Returns 0.0 if no gamepad connected.
-     */
-    float getGamepadAxis(SDL_GamepadAxis axis, float deadZone = 0.15f) const;
-
-    /**
-     * @brief Gets the current value of the left trigger.
-     * @return The trigger value, normalized between 0.0 and 1.0. Returns 0.0 if no gamepad connected.
-     */
+    // Gamepad input
+    float getGamepadAxis(SDL_GameControllerAxis axis, float deadZone = 0.1f) const;
     float getGamepadTriggerLeft() const;
-
-    /**
-     * @brief Gets the current value of the right trigger.
-     * @return The trigger value, normalized between 0.0 and 1.0. Returns 0.0 if no gamepad connected.
-     */
     float getGamepadTriggerRight() const;
-
-    /**
-    * @brief Checks if a gamepad is currently connected.
-    * @return True if a gamepad is connected and recognized.
-    */
     bool isGamepadConnected() const;
 
+    bool quitRequested() const { return m_quitRequested; }
+
+    // Binding configuration
+    bool loadBindings(const std::string& filePath);
+    void bindKey(SDL_Keycode key, GameAction action);
+    void bindMouseButton(uint8_t button, GameAction action);
+    void bindGamepadButton(SDL_GameControllerButton button, GameAction action);
+    void unbindKey(SDL_Keycode key);
 
 private:
-    // --- Internal State ---
-    bool m_quitRequested = false;
+    // Map SDL_Scancode to GameAction
+    std::map<SDL_Keycode, GameAction> m_keyBindings;
+    // Map SDL_MouseButtonID to GameAction
+    std::map<uint8_t, GameAction> m_mouseButtonBindings;
+    // Map SDL_GamepadButton to GameAction
+    std::map<SDL_GameControllerButton, GameAction> m_gamepadButtonBindings;
 
-    // Keyboard state
+    // Current state of actions (true if pressed)
+    std::map<GameAction, bool> m_actionPressed;
+    // Actions that were just pressed in the current frame
+    std::map<GameAction, bool> m_actionJustPressed;
+    // Actions that were just released in the current frame
+    std::map<GameAction, bool> m_actionJustReleased;
+
+    // Raw input states
     std::set<SDL_Keycode> m_currentKeys;
     std::set<SDL_Keycode> m_justPressedKeys;
     std::set<SDL_Keycode> m_justReleasedKeys;
 
-    // Mouse state
     MouseState m_mouseState;
-    MouseState m_previousMouseState; // To calculate delta
+    MouseState m_previousMouseState; // For delta calculation
 
-    // Gamepad state (simplified to one gamepad for now)
     GamepadState m_gamepadState;
-    std::map<SDL_JoystickID, SDL_Gamepad*> m_activeGamepads; // Manage multiple later
 
-    // --- Bindings ---
-    std::map<SDL_Keycode, GameAction> m_keyBindings;
-    std::map<Uint8, GameAction> m_mouseButtonBindings;
-    std::map<SDL_GamepadButton, GameAction> m_gamepadButtonBindings;
+    bool m_quitRequested = false;
 
-    // --- Action States ---
-    // Updated based on bindings and current input states
-    std::map<GameAction, bool> m_actionPressed;
-    std::map<GameAction, bool> m_actionJustPressed;
-    std::map<GameAction, bool> m_actionJustReleased;
-
-    // --- Helper Methods ---
-    /**
-     * @brief Resets the "just pressed/released" states at the start of a frame.
-     */
-    void clearTransientStates();
-
-    /**
-     * @brief Updates the state of all mapped actions based on current input.
-     */
-    void updateActionStates();
-
-    /**
-     * @brief Handles adding a new gamepad device.
-     * @param which The SDL_JoystickID of the device.
-     */
-    void addGamepad(SDL_JoystickID which);
-
-     /**
-      * @brief Handles removing a gamepad device.
-      * @param which The SDL_JoystickID of the device instance.
-      */
-    void removeGamepad(SDL_JoystickID which);
-
-    /**
-     * @brief Sets up default input bindings.
-     */
     void loadDefaultBindings();
-
-    /**
-     * @brief Normalizes raw axis value from SDL to -1.0 to 1.0 range.
-     */
+    void addGamepad(SDL_JoystickID which);
+    void removeGamepad(SDL_JoystickID which);
     float normalizeAxisValue(Sint16 rawValue) const;
 };
 
 } // namespace TuxArena
+
+#endif // TUXARENA_INPUTMANAGER_H

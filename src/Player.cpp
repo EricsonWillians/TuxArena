@@ -1,313 +1,289 @@
 // src/Player.cpp
 #include "TuxArena/Player.h"
-#include "TuxArena/EntityManager.h" // For spawning projectiles
-#include "TuxArena/InputManager.h"  // For reading input
-#include "TuxArena/Renderer.h"    // For rendering the player
-#include "TuxArena/MapManager.h"    // For collision detection
-#include "TuxArena/Entity.h"      // For EntityType::PROJECTILE_BULLET (define later)
+#include "TuxArena/InputManager.h"
+#include "TuxArena/Renderer.h"
+#include "TuxArena/EntityManager.h"
+#include "TuxArena/ProjectileBullet.h"
+#include "TuxArena/Log.h"
+#include "TuxArena/MapManager.h"
+#include "TuxArena/ParticleManager.h"
 
-#include "SDL3/SDL.h" // For SDL_Log, potentially timing/math functions
-
-#include <cmath> // For std::atan2, std::cos, std::sin
+#include <cmath> // For std::sin, std::cos, std::atan2, std::sqrt
+#include <algorithm> // For std::min, std::max
 
 namespace TuxArena {
 
-// Define EntityType for projectiles if not done elsewhere yet
-// Ideally, these would be consolidated.
-// enum class EntityType { PROJECTILE_BULLET }; // Already in Entity.h
-
-Player::Player(EntityManager* manager) :
-    Entity(manager, EntityType::PLAYER) // Call base constructor, specify type
-{
-    // Initialize player-specific defaults
-    setSize(32.0f, 32.0f); // Example size in pixels
-    m_health = 100;
-    m_shootTimer = 0.0f; // Ready to shoot initially
-    // std::cout << "Player entity created." << std::endl;
+Player::Player(EntityManager* manager)
+    : Entity(manager, EntityType::PLAYER) {
+    Log::Info("Player instance created.");
+    setSize(32.0f, 32.0f); // Default player size
 }
 
 void Player::initialize(const EntityContext& context) {
-    // Called by EntityManager after creation and basic setup
-    // std::cout << "Player ID " << getId() << " initialized." << std::endl;
-    // Pre-load assets here? Or handle in first render/update?
-    // For now, texture loading is deferred to the render method.
+    Log::Info("Player initialized.");
+
+    // Load player texture and stats based on selected character
+    if (context.modManager && !context.playerCharacterId.empty()) {
+        const CharacterInfo* selectedChar = context.modManager->getCharacterDefinition(context.playerCharacterId);
+        if (selectedChar) {
+            m_playerTexture = context.renderer->loadTexture(selectedChar->texturePath);
+            if (!m_playerTexture) {
+                Log::Error("Failed to load texture for selected character: " + selectedChar->texturePath);
+            }
+            m_health = selectedChar->health;
+            m_moveSpeed = selectedChar->speed;
+            Log::Info("Player stats loaded from character: " + selectedChar->name + ", Health: " + std::to_string(m_health) + ", Speed: " + std::to_string(m_moveSpeed));
+        } else {
+            Log::Warning("Selected character ID '" + context.playerCharacterId + "' not found in ModManager. Using default stats and texture.");
+            // Fallback to default texture and stats
+            m_playerTexture = context.renderer->loadTexture(m_texturePath);
+            if (!m_playerTexture) {
+                Log::Error("Failed to load default player texture: " + m_texturePath);
+            }
+            m_health = 100.0f;
+            m_moveSpeed = 200.0f;
+        }
+    } else if (context.renderer) {
+        // Fallback to default if no character selected or modManager is null
+        m_playerTexture = context.renderer->loadTexture(m_texturePath);
+        if (!m_playerTexture) {
+            Log::Error("Failed to load default player texture: " + m_texturePath);
+        }
+        m_health = 100.0f;
+        m_moveSpeed = 200.0f;
+    }
+
+    // Add weapons from ModManager
+    if (context.modManager) {
+        const auto& weaponDefs = context.modManager->getWeaponDefinitions();
+        if (weaponDefs.empty()) {
+            Log::Warning("No weapon definitions loaded by ModManager. Adding hardcoded defaults.");
+            // Add hardcoded defaults if no mods provide weapons
+            WeaponDef pistol_def;
+            pistol_def.name = "Pistol";
+            pistol_def.fireRate = 5.0f;
+            pistol_def.projectileDamage = 10.0f;
+            addWeapon(std::make_unique<Weapon>(pistol_def, this));
+
+            WeaponDef shotgun_def;
+            shotgun_def.type = WeaponType::SHOTGUN;
+            shotgun_def.name = "Shotgun";
+            shotgun_def.fireRate = 1.5f;
+            shotgun_def.projectilesPerShot = 8;
+            shotgun_def.spreadAngle = 20.0f;
+            shotgun_def.projectileDamage = 8.0f;
+            addWeapon(std::make_unique<Weapon>(shotgun_def, this));
+        } else {
+            for (const auto& pair : weaponDefs) {
+                addWeapon(std::make_unique<Weapon>(pair.second, this));
+            }
+        }
+    }
+
+    if (!m_weapons.empty()) {
+        m_currentWeaponIndex = 0;
+    } else {
+        m_currentWeaponIndex = -1;
+    }
 }
 
 void Player::update(const EntityContext& context) {
-    // --- Timers ---
-    if (m_shootTimer > 0.0f) {
-        m_shootTimer -= context.deltaTime;
+    // Only process input if this is the client-controlled player
+    if (!context.isServer && context.inputManager) {
+        handleInput(context);
     }
 
-    // --- Input ---
-    // Read input and set internal movement/action intentions
-    handleInput(context);
-
-    // --- Actions ---
-    attemptShoot(context);
-
-    // --- Movement & Collision ---
-    // Calculate movement based on intentions and handle map collisions
     applyMovement(context);
 
-    // --- Aiming ---
-    // Update aim direction (e.g., towards mouse cursor if applicable)
-    if (context.inputManager && !context.isServer) { // Client-side aiming towards mouse
-        float mouseX, mouseY;
-        context.inputManager->getMousePosition(mouseX, mouseY);
-        // Convert mouse screen coordinates to world coordinates if camera exists
-        // Assuming direct correlation for now:
-        float dx = mouseX - m_position.x;
-        float dy = mouseY - m_position.y;
-        float len = std::sqrt(dx * dx + dy * dy);
-        if (len > 0.01f) { // Avoid division by zero / normalize only if mouse moved significantly
-             m_aimDirection.x = dx / len;
-             m_aimDirection.y = dy / len;
-             // Optionally, set player rotation to match aim direction
-             // m_rotation = std::atan2(m_aimDirection.y, m_aimDirection.x) * (180.0f / M_PI); // Convert radians to degrees
-        }
-    } else {
-        // Server or non-mouse aim: Aim direction might follow rotation instead
-        // float angleRad = m_rotation * (M_PI / 180.0f);
-        // m_aimDirection = { std::cos(angleRad), std::sin(angleRad) };
+    // Update current weapon
+    if (m_currentWeaponIndex != -1) {
+        m_weapons[m_currentWeaponIndex]->update(context);
     }
 
-    // --- Other Logic ---
-    // Health regeneration, animation updates, etc.
-}
-
-void Player::handleInput(const EntityContext& context) {
-    if (!context.inputManager || context.isServer) {
-        // No input handling on the server side directly for player movement
-        // Server would receive client input via network messages
-        m_moveInput = {0.0f, 0.0f};
-        m_rotationInput = 0.0f;
-        return;
-    }
-
-    // --- Movement Input ---
-    m_moveInput = {0.0f, 0.0f}; // Reset intention each frame
-    if (context.inputManager->isActionPressed(GameAction::MOVE_FORWARD)) {
-        m_moveInput.y -= 1.0f; // Assuming -Y is forward in top-down
-    }
-    if (context.inputManager->isActionPressed(GameAction::MOVE_BACKWARD)) {
-        m_moveInput.y += 1.0f;
-    }
-    if (context.inputManager->isActionPressed(GameAction::MOVE_LEFT)) {
-        m_moveInput.x -= 1.0f;
-    }
-    if (context.inputManager->isActionPressed(GameAction::MOVE_RIGHT)) {
-        m_moveInput.x += 1.0f;
-    }
-
-    // Normalize diagonal movement vector to prevent faster diagonal speed
-    float lenSq = m_moveInput.x * m_moveInput.x + m_moveInput.y * m_moveInput.y;
-    if (lenSq > 1.0f) {
-        float len = std::sqrt(lenSq);
-        m_moveInput.x /= len;
-        m_moveInput.y /= len;
-    }
-
-    // --- Rotation Input (Keyboard Example - Overridden by Mouse Aim if Active) ---
-    // Uncomment if keyboard rotation is desired instead of mouse aim setting rotation
-    /*
-    m_rotationInput = 0.0f;
-    if (context.inputManager->isActionPressed(GameAction::ROTATE_LEFT)) { // Assume ROTATE actions exist
-        m_rotationInput -= 1.0f;
-    }
-    if (context.inputManager->isActionPressed(GameAction::ROTATE_RIGHT)) {
-        m_rotationInput += 1.0f;
-    }
-    */
-
-    // Sprinting could modify m_moveSpeed here
-    // if (context.inputManager->isActionPressed(GameAction::SPRINT)) { ... }
-}
-
-void Player::applyMovement(const EntityContext& context) {
-    // --- Rotation ---
-    // Apply keyboard rotation if used
-    // m_rotation += m_rotationInput * m_rotationSpeed * context.deltaTime;
-    // Keep rotation within 0-360 degrees (optional)
-    // m_rotation = std::fmod(m_rotation, 360.0f);
-    // if (m_rotation < 0.0f) m_rotation += 360.0f;
-
-    // Rotation determined by mouse aim direction (calculated in update)
-    // Convert aim direction back to angle if needed for rendering/logic
-     m_rotation = std::atan2(m_aimDirection.y, m_aimDirection.x) * (180.0f / M_PI);
-
-
-    // --- Position ---
-    Vec2 velocity = {m_moveInput.x * m_moveSpeed, m_moveInput.y * m_moveSpeed};
-    Vec2 deltaPos = velocity * context.deltaTime;
-    Vec2 currentPos = getPosition();
-    Vec2 nextPos = currentPos + deltaPos;
-
-    // --- Collision ---
-    // Check against map collision shapes BEFORE updating position
-    if (context.mapManager && (std::abs(deltaPos.x) > 0.001f || std::abs(deltaPos.y) > 0.001f)) {
-         nextPos = resolveMapCollision(currentPos, nextPos, context);
-    }
-
-    // --- Update State ---
-    setPosition(nextPos);
-    // Set velocity state if needed for physics/networking
-    // setVelocity(velocity); // This might be simplified velocity based only on input
-}
-
-
-Vec2 Player::resolveMapCollision(const Vec2& currentPos, const Vec2& nextPos, const EntityContext& context) {
-     if (!context.mapManager) return nextPos; // No map, no collision
-
-     // Simple AABB vs Polygon/Rect collision detection
-     // Player AABB calculation (assuming position is center)
-     float halfWidth = m_size.x / 2.0f;
-     float halfHeight = m_size.y / 2.0f;
-     SDL_FRect playerRectNext = {
-         nextPos.x - halfWidth,
-         nextPos.y - halfHeight,
-         m_size.x,
-         m_size.y
-     };
-
-     Vec2 resolvedPos = nextPos; // Start with intended position
-
-     const auto& collisionShapes = context.mapManager->getCollisionShapes();
-     for (const auto& shape : collisionShapes) {
-         // Broadphase check (optional but recommended for performance)
-         SDL_FRect shapeAABB = { shape.minX, shape.minY, shape.maxX - shape.minX, shape.maxY - shape.minY };
-         if (!SDL_HasRectIntersectionFloat(&playerRectNext, &shapeAABB)) {
-             continue; // No intersection with shape's bounding box
-         }
-
-         // Narrowphase check (AABB vs AABB for now, needs AABB vs Polygon later)
-         // For simplicity, just check AABB intersection again
-          if (SDL_HasRectIntersectionFloat(&playerRectNext, &shapeAABB)) {
-              // Collision detected! Simple resolution: Stop movement by reverting to currentPos.
-              // A better approach involves calculating penetration depth and sliding.
-              // For now, just prevent movement into the object. This is jerky.
-              // Try resolving axis by axis:
-              Vec2 moveAttemptX = {nextPos.x, currentPos.y};
-              Vec2 moveAttemptY = {currentPos.x, nextPos.y};
-
-              SDL_FRect playerRectX = playerRectNext; playerRectX.y = currentPos.y - halfHeight;
-              SDL_FRect playerRectY = playerRectNext; playerRectY.x = currentPos.x - halfWidth;
-
-
-              bool collisionX = false;
-               if (SDL_HasRectIntersectionFloat(&playerRectX, &shapeAABB)) {
-                   collisionX = true;
-               }
-
-              bool collisionY = false;
-               if (SDL_HasRectIntersectionFloat(&playerRectY, &shapeAABB)) {
-                   collisionY = true;
-               }
-
-              // Block movement on the axis that collided
-              if(collisionX) {
-                  resolvedPos.x = currentPos.x; // Block X movement
-                  playerRectNext.x = currentPos.x - halfWidth; // Update rect for Y check
-              }
-              if(collisionY) {
-                  resolvedPos.y = currentPos.y; // Block Y movement
-                  playerRectNext.y = currentPos.y - halfHeight; // Update rect just in case
-              }
-
-              // If still colliding after resolving one axis (e.g., corner collision), block both?
-              // This basic axis separation is still prone to issues. A proper SAT or penetration vector
-              // calculation is needed for smooth sliding.
-              // For now, if we blocked X and Y independently, we might still be inside.
-              // Let's just stick with the axis-blocking version:
-              // resolvedPos is now the position after trying to move X then Y and blocking if necessary.
-
-              // Update playerRectNext based on resolvedPos for next iteration
-              playerRectNext.x = resolvedPos.x - halfWidth;
-              playerRectNext.y = resolvedPos.y - halfHeight;
-
-              // If both axes were blocked, we are essentially back at currentPos for this shape interaction.
-          }
-     }
-
-     return resolvedPos; // Return the potentially adjusted position
-}
-
-
-void Player::attemptShoot(const EntityContext& context) {
-    if (!context.inputManager || !context.entityManager || context.isServer) {
-        return; // Shooting initiated by client input, requires EntityManager
-    }
-
-    if (context.inputManager->isActionPressed(GameAction::SHOOT) && m_shootTimer <= 0.0f) {
-        // Reset cooldown timer
-        m_shootTimer = m_shootCooldown;
-
-        // Calculate spawn position (e.g., slightly in front of the player center)
-        float spawnDist = m_size.x / 2.0f + 5.0f; // Spawn 5 pixels ahead of radius
-        Vec2 spawnPos = m_position + (m_aimDirection * spawnDist);
-
-        // Calculate bullet velocity
-        float bulletSpeed = 500.0f;
-        Vec2 bulletVel = m_aimDirection * bulletSpeed;
-
-        // Create the bullet entity (requires ProjectileBullet type definition)
-        EntityContext bulletContext = context; // Pass context along?
-        context.entityManager->createEntity(
-            EntityType::PROJECTILE_BULLET, // Need to define this type
-            spawnPos,
-            bulletContext, // Pass context for initialize if needed
-            m_rotation,  // Initial rotation matches player/aim
-            bulletVel    // Initial velocity
-            // Use default bullet size or specify here
-        );
-
-        // std::cout << "Player ID " << getId() << " shot." << std::endl;
-        // Play sound effect (requires audio system)
-        // context.audioManager->playSound("shoot.wav");
+    // Attempt to shoot if input is active
+    if (m_shootInput) {
+        attemptShoot(context);
     }
 }
 
 void Player::render(Renderer& renderer) {
-    // Load texture if not already loaded
-    if (!m_playerTexture) {
-        m_playerTexture = renderer.loadTexture(m_texturePath);
-        if (!m_playerTexture) {
-            std::cerr << "ERROR: Failed to load player texture: " << m_texturePath << std::endl;
-            // Optionally draw a placeholder shape if texture fails
-            SDL_FRect errorRect = {m_position.x - m_size.x / 2.0f, m_position.y - m_size.y / 2.0f, m_size.x, m_size.y};
-            renderer.drawRect(&errorRect, {255, 0, 0, 255}); // Red rectangle
-            return;
-        }
+    if (m_playerTexture) {
+        SDL_FRect dstRect = {
+            m_position.x - m_size.x / 2.0f,
+            m_position.y - m_size.y / 2.0f,
+            m_size.x,
+            m_size.y
+        };
+        // Render with rotation
+        renderer.drawTexture(m_playerTexture, nullptr, &dstRect, m_rotation);
+    } else {
+        // Fallback: draw a colored rectangle if texture not loaded
+        SDL_FRect rect = {
+            m_position.x - m_size.x / 2.0f,
+            m_position.y - m_size.y / 2.0f,
+            m_size.x,
+            m_size.y
+        };
+        renderer.drawRect(&rect, {0, 255, 0, 255}, true); // Green rectangle
     }
-
-    // Destination rectangle (assuming position is center)
-    SDL_FRect dstRect = {
-        m_position.x - m_size.x / 2.0f,
-        m_position.y - m_size.y / 2.0f,
-        m_size.x,
-        m_size.y
-    };
-
-    // Draw the player texture rotated
-    renderer.drawTexture(m_playerTexture, nullptr, &dstRect, m_rotation, SDL_FLIP_NONE);
-
-    // --- Optional: Render Debug Info ---
-    #if defined(DEBUG_RENDER) || 1 // Enable debug rendering easily for now
-        // Draw aim direction line
-        Vec2 lineEnd = m_position + (m_aimDirection * m_size.x); // Line length based on size
-        // Need a drawLine method in Renderer
-        // renderer.drawLine(m_position.x, m_position.y, lineEnd.x, lineEnd.y, {0, 255, 0, 255}); // Green line
-
-        // Draw bounding box
-        // renderer.drawRectOutline(&dstRect, {255, 255, 0, 150}); // Yellow outline
-    #endif
 }
 
 void Player::onDestroy(const EntityContext& context) {
-    // std::cout << "Player ID " << getId() << " destroyed." << std::endl;
-    // Release resources if necessary (e.g., textures loaded specifically by this instance - unlikely here)
-    // Texture is cached by Renderer, so no need to free m_playerTexture here.
+    (void)context; // Suppress unused parameter warning
 }
 
+void Player::handleInput(const EntityContext& context) {
+    m_moveInput = {0.0f, 0.0f};
+    m_shootInput = false;
+
+    if (context.inputManager->isActionPressed(GameAction::MOVE_FORWARD)) {
+        m_moveInput.y -= 1.0f;
+    }
+    if (context.inputManager->isActionPressed(GameAction::MOVE_BACKWARD)) {
+        m_moveInput.y += 1.0f;
+    }
+    if (context.inputManager->isActionPressed(GameAction::STRAFE_LEFT)) {
+        m_moveInput.x -= 1.0f;
+    }
+    if (context.inputManager->isActionPressed(GameAction::STRAFE_RIGHT)) {
+        m_moveInput.x += 1.0f;
+    }
+
+    // Rotation input
+    if (context.inputManager->isActionPressed(GameAction::TURN_LEFT)) {
+        m_rotationInput -= 1.0f;
+    }
+    if (context.inputManager->isActionPressed(GameAction::TURN_RIGHT)) {
+        m_rotationInput += 1.0f;
+    }
+
+    // Normalize movement input if diagonal movement is faster
+    float moveLength = std::sqrt(m_moveInput.x * m_moveInput.x + m_moveInput.y * m_moveInput.y);
+    if (moveLength > 1.0f) {
+        m_moveInput.x /= moveLength;
+        m_moveInput.y /= moveLength;
+    }
+
+    // Mouse aiming
+    float mouseX, mouseY;
+    context.inputManager->getMousePosition(mouseX, mouseY);
+    // Calculate direction from player to mouse
+    float dx = mouseX - m_position.x;
+    float dy = mouseY - m_position.y;
+    m_rotation = std::atan2(dy, dx) * (180.0f / M_PI); // Convert radians to degrees
+
+    // Shooting input
+    if (context.inputManager->isActionPressed(GameAction::FIRE_PRIMARY)) {
+        m_shootInput = true;
+    }
+
+    // Weapon switching input
+    if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_1)) {
+        switchWeapon(0);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_2)) {
+        switchWeapon(1);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_3)) {
+        switchWeapon(2);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_4)) {
+        switchWeapon(3);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_5)) {
+        switchWeapon(4);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_6)) {
+        switchWeapon(5);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_7)) {
+        switchWeapon(6);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_8)) {
+        switchWeapon(7);
+    } else if (context.inputManager->isActionPressed(GameAction::WEAPON_SLOT_9)) {
+        switchWeapon(8);
+    }
+}
+
+void Player::applyMovement(const EntityContext& context) {
+    // Apply rotation
+    if (m_rotationInput != 0.0f) {
+        m_rotation += m_rotationSpeed * context.deltaTime * m_rotationInput;
+        // Keep rotation within 0-360 degrees
+        if (m_rotation >= 360.0f) m_rotation -= 360.0f;
+        if (m_rotation < 0.0f) m_rotation += 360.0f;
+    }
+
+    Vec2 currentPos = m_position;
+    Vec2 desiredVelocity = {0.0f, 0.0f};
+
+    // Convert rotation to radians for trigonometric functions
+    float rotationRad = m_rotation * (M_PI / 180.0f);
+
+    // Calculate forward/backward movement
+    if (m_moveInput.y != 0.0f) {
+        desiredVelocity.x += m_moveInput.y * std::cos(rotationRad) * m_moveSpeed;
+        desiredVelocity.y += m_moveInput.y * std::sin(rotationRad) * m_moveSpeed;
+    }
+
+    // Calculate strafing movement (90 degrees to the right of current rotation)
+    if (m_moveInput.x != 0.0f) {
+        float strafeRotationRad = (m_rotation + 90.0f) * (M_PI / 180.0f);
+        desiredVelocity.x += m_moveInput.x * std::cos(strafeRotationRad) * m_moveSpeed;
+        desiredVelocity.y += m_moveInput.x * std::sin(strafeRotationRad) * m_moveSpeed;
+    }
+
+    Vec2 nextPos = {currentPos.x + desiredVelocity.x * context.deltaTime, currentPos.y + desiredVelocity.y * context.deltaTime};
+
+    // Basic map boundary collision (AABB vs AABB for map bounds)
+    if (context.mapManager) {
+        float mapWidth = static_cast<float>(context.mapManager->getMapWidthPixels());
+        float mapHeight = static_cast<float>(context.mapManager->getMapHeightPixels());
+
+        // Clamp player position within map boundaries
+        nextPos.x = std::max(m_size.x / 2.0f, std::min(nextPos.x, mapWidth - m_size.x / 2.0f));
+        nextPos.y = std::max(m_size.y / 2.0f, std::min(nextPos.y, mapHeight - m_size.y / 2.0f));
+    }
+
+    m_position = nextPos;
+}
+
+void Player::attemptShoot(const EntityContext& context) {
+    if (m_currentWeaponIndex != -1) {
+        m_weapons[m_currentWeaponIndex]->shoot(context);
+    }
+}
+
+void Player::takeDamage(float damage, uint32_t instigatorId) {
+    (void)instigatorId; // Suppress unused parameter warning
+    m_health -= damage;
+    Log::Info("Player took " + std::to_string(damage) + " damage, health is now " + std::to_string(m_health));
+    if (m_health <= 0) {
+        Log::Info("Player has died.");
+        // Handle death
+    }
+
+    // Emit blood particles
+    if (m_entityManager) {
+        m_entityManager->getParticleManager()->emitBlood(m_position.x, m_position.y, 20);
+    }
+}
+
+void Player::addWeapon(std::unique_ptr<Weapon> weapon) {
+    m_weapons.push_back(std::move(weapon));
+    if (m_currentWeaponIndex == -1) {
+        m_currentWeaponIndex = 0; // Equip the first weapon added
+    }
+}
+
+void Player::switchWeapon(int slotIndex) {
+    if (slotIndex >= 0 && static_cast<size_t>(slotIndex) < m_weapons.size()) {
+        m_currentWeaponIndex = slotIndex;
+        Log::Info("Switched to weapon: " + m_weapons[m_currentWeaponIndex]->getDefinition().name);
+    } else {
+        Log::Warning("Attempted to switch to invalid weapon slot: " + std::to_string(slotIndex));
+    }
+}
+
+Weapon* Player::getCurrentWeapon() const {
+    if (m_currentWeaponIndex != -1 && static_cast<size_t>(m_currentWeaponIndex) < m_weapons.size()) {
+        return m_weapons[m_currentWeaponIndex].get();
+    }
+    return nullptr;
+}
 
 } // namespace TuxArena

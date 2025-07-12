@@ -1,7 +1,10 @@
 // src/InputManager.cpp
 #include "TuxArena/InputManager.h"
-#include "SDL3/SDL_events.h"
-#include "SDL3/SDL.h" // For SDL_Log, SDL_GetTicks, etc.
+#include "SDL2/SDL_events.h"
+#include "SDL2/SDL.h" // For SDL_Log, SDL_GetTicks, etc.
+#include "SDL2/SDL_gamecontroller.h" // For SDL_GameController, SDL_GameControllerButton, etc.
+#include "TuxArena/Log.h" // Added for logging
+#include "imgui_impl_sdl2.h" // Added for ImGui event processing
 
 #include <iostream> // For basic logging/error messages
 #include <cmath>    // For std::abs in deadzone check
@@ -14,72 +17,79 @@ const float GAMEPAD_AXIS_MAX = 32767.0f;
 
 
 InputManager::InputManager() {
-    std::cout << "Initializing InputManager..." << std::endl;
+    Log::Info("Initializing InputManager...");
     loadDefaultBindings(); // Setup basic WSAD/Mouse/Gamepad controls
     // SDL_Init(SDL_INIT_GAMEPAD) should be called in main.cpp
     // Check for already connected gamepads at startup
-    int numJoysticks = 0;
-    SDL_JoystickID* joysticks = SDL_GetJoysticks(&numJoysticks);
-    if (joysticks) {
-        for (int i = 0; i < numJoysticks; ++i) {
-             if (SDL_IsGamepad(joysticks[i])) {
-                 addGamepad(joysticks[i]);
-                 // For simplicity, only handle the first gamepad found initially
-                 if (m_gamepadState.isConnected) break;
-             }
+    int numJoysticks = SDL_NumJoysticks();
+    for (int i = 0; i < numJoysticks; ++i) {
+        if (SDL_IsGameController(i)) {
+            addGamepad(i);
+            // For simplicity, only handle the first gamepad found initially
+            if (m_gamepadState.isConnected) break;
         }
-        SDL_free(joysticks);
     }
-     std::cout << "InputManager initialized. " << (m_gamepadState.isConnected ? "Gamepad detected." : "No gamepad detected.") << std::endl;
+     Log::Info(std::string("InputManager initialized. ") + (m_gamepadState.isConnected ? "Gamepad detected." : "No gamepad detected."));
 
 }
 
 InputManager::~InputManager() {
-    std::cout << "Shutting down InputManager..." << std::endl;
+    Log::Info("Shutting down InputManager...");
     // Close any open gamepads
     if (m_gamepadState.instance) {
-        SDL_CloseGamepad(m_gamepadState.instance);
+        SDL_GameControllerClose(m_gamepadState.instance);
         m_gamepadState.instance = nullptr;
-         m_gamepadState.isConnected = false;
+        m_gamepadState.isConnected = false;
     }
      // Clean up m_activeGamepads map if supporting multiple
-    std::cout << "InputManager shut down." << std::endl;
+    Log::Info("InputManager shut down.");
 
 }
 
 void InputManager::loadDefaultBindings() {
-     std::cout << "Loading default input bindings..." << std::endl;
+     Log::Info("Loading default input bindings...");
     // Keyboard - Movement
-    bindKey(SDLK_w, GameAction::MOVE_FORWARD);
-    bindKey(SDLK_UP, GameAction::MOVE_FORWARD);
-    bindKey(SDLK_s, GameAction::MOVE_BACKWARD);
-    bindKey(SDLK_DOWN, GameAction::MOVE_BACKWARD);
-    bindKey(SDLK_a, GameAction::MOVE_LEFT);
-    bindKey(SDLK_LEFT, GameAction::MOVE_LEFT);
-    bindKey(SDLK_d, GameAction::MOVE_RIGHT);
-    bindKey(SDLK_RIGHT, GameAction::MOVE_RIGHT);
-    bindKey(SDLK_LSHIFT, GameAction::SPRINT);
-    bindKey(SDLK_SPACE, GameAction::JUMP); // Or maybe SHOOT?
+    bindKey(SDL_SCANCODE_W, GameAction::MOVE_FORWARD);
+    bindKey(SDL_SCANCODE_UP, GameAction::MOVE_FORWARD);
+    bindKey(SDL_SCANCODE_S, GameAction::MOVE_BACKWARD);
+    bindKey(SDL_SCANCODE_DOWN, GameAction::MOVE_BACKWARD);
+    bindKey(SDL_SCANCODE_A, GameAction::STRAFE_LEFT);
+    bindKey(SDL_SCANCODE_LEFT, GameAction::TURN_LEFT);
+    bindKey(SDL_SCANCODE_D, GameAction::STRAFE_RIGHT);
+    bindKey(SDL_SCANCODE_RIGHT, GameAction::TURN_RIGHT);
+    bindKey(SDL_SCANCODE_LSHIFT, GameAction::SPRINT);
+    bindKey(SDL_SCANCODE_SPACE, GameAction::JUMP); // Or maybe SHOOT?
 
     // Keyboard - Actions
-    bindKey(SDLK_e, GameAction::INTERACT);
-    bindKey(SDLK_TAB, GameAction::SHOW_SCORES);
-    bindKey(SDLK_ESCAPE, GameAction::PAUSE_MENU);
+    bindKey(SDL_SCANCODE_E, GameAction::INTERACT);
+    bindKey(SDL_SCANCODE_TAB, GameAction::SHOW_SCORES);
+    bindKey(SDL_SCANCODE_ESCAPE, GameAction::PAUSE);
 
     // Mouse
-    bindMouseButton(SDL_BUTTON_LEFT, GameAction::SHOOT);
-    bindMouseButton(SDL_BUTTON_RIGHT, GameAction::ALT_SHOOT);
+    bindMouseButton(SDL_BUTTON_LEFT, GameAction::FIRE_PRIMARY);
+    bindMouseButton(SDL_BUTTON_RIGHT, GameAction::FIRE_SECONDARY);
+
+    // Keyboard - Weapon Slots
+    bindKey(SDL_SCANCODE_1, GameAction::WEAPON_SLOT_1);
+    bindKey(SDL_SCANCODE_2, GameAction::WEAPON_SLOT_2);
+    bindKey(SDL_SCANCODE_3, GameAction::WEAPON_SLOT_3);
+    bindKey(SDL_SCANCODE_4, GameAction::WEAPON_SLOT_4);
+    bindKey(SDL_SCANCODE_5, GameAction::WEAPON_SLOT_5);
+    bindKey(SDL_SCANCODE_6, GameAction::WEAPON_SLOT_6);
+    bindKey(SDL_SCANCODE_7, GameAction::WEAPON_SLOT_7);
+    bindKey(SDL_SCANCODE_8, GameAction::WEAPON_SLOT_8);
+    bindKey(SDL_SCANCODE_9, GameAction::WEAPON_SLOT_9);
 
     // Gamepad - Common Mappings (XInput style)
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_A, GameAction::JUMP); // Or Interact
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_B, GameAction::SPRINT); // Or Crouch/Back
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_X, GameAction::INTERACT); // Or Reload
-    //bindGamepadButton(SDL_GAMEPAD_BUTTON_Y, GameAction::SWITCH_WEAPON);
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, GameAction::ALT_SHOOT);
-    //bindGamepadButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, GameAction::NEXT_WEAPON);
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_START, GameAction::PAUSE_MENU);
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_BACK, GameAction::SHOW_SCORES);
-    bindGamepadButton(SDL_GAMEPAD_BUTTON_LEFT_STICK, GameAction::SPRINT);
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_A, GameAction::JUMP); // Or Interact
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_B, GameAction::SPRINT); // Or Crouch/Back
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_X, GameAction::INTERACT); // Or Reload
+    //bindGamepadButton(SDL_CONTROLLER_BUTTON_Y, GameAction::SWITCH_WEAPON);
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_LEFTSHOULDER, GameAction::FIRE_SECONDARY);
+    //bindGamepadButton(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER, GameAction::NEXT_WEAPON);
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_START, GameAction::PAUSE_MENU);
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_BACK, GameAction::SHOW_SCORES);
+    bindGamepadButton(SDL_CONTROLLER_BUTTON_LEFTSTICK, GameAction::SPRINT);
     //bindGamepadButton(SDL_GAMEPAD_BUTTON_DPAD_UP, GameAction::SWITCH_WEAPON_UP);
     // ... map other DPAD directions if needed
 
@@ -108,154 +118,123 @@ void InputManager::clearTransientStates() {
     m_actionJustReleased.clear();
 }
 
-void InputManager::pollEvents() {
-    clearTransientStates();
-    m_previousMouseState = m_mouseState; // Store previous state for delta calculation
+void InputManager::processSDLEvent(SDL_Event& event) {
+    ImGui_ImplSDL2_ProcessEvent(&event); // Pass event to ImGui
 
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_EVENT_QUIT:
-                m_quitRequested = true;
-                break;
+    switch (event.type) {
+        case SDL_QUIT:
+            m_quitRequested = true;
+            break;
 
-            // --- Keyboard ---
-            case SDL_EVENT_KEY_DOWN:
-                // Ignore key repeats for "just pressed" logic
-                if (event.key.repeat == 0) {
-                    SDL_Keycode key = event.key.keysym.sym;
-                    bool wasPressed = m_currentKeys.count(key);
-                    m_currentKeys.insert(key);
-                    if (!wasPressed) {
-                        m_justPressedKeys.insert(key);
-                        // Update action state if bound
-                         if (m_keyBindings.count(key)) {
-                             m_actionJustPressed[m_keyBindings[key]] = true;
-                         }
-                    }
+        // --- Keyboard ---
+        case SDL_KEYDOWN:
+            // Ignore key repeats for "just pressed" logic
+            if (event.key.repeat == 0) {
+                SDL_Keycode key = event.key.keysym.sym;
+                bool wasPressed = m_currentKeys.count(key);
+                m_currentKeys.insert(key);
+                if (!wasPressed) {
+                    m_justPressedKeys.insert(key);
                 }
-                break;
+            }
+            break;
 
-            case SDL_EVENT_KEY_UP:
-                if (event.key.repeat == 0) { // Should always be 0 for up event
-                    SDL_Keycode key = event.key.keysym.sym;
-                    if (m_currentKeys.count(key)) {
-                        m_currentKeys.erase(key);
-                        m_justReleasedKeys.insert(key);
-                         // Update action state if bound
-                         if (m_keyBindings.count(key)) {
-                             m_actionJustReleased[m_keyBindings[key]] = true;
-                         }
-                    }
+        case SDL_KEYUP:
+            if (event.key.repeat == 0) { // Should always be 0 for up event
+                SDL_Keycode key = event.key.keysym.sym;
+                if (m_currentKeys.count(key)) {
+                    m_currentKeys.erase(key);
+                    m_justReleasedKeys.insert(key);
                 }
-                break;
+            }
+            break;
 
-            // --- Mouse ---
-            case SDL_EVENT_MOUSE_MOTION:
-                m_mouseState.x = event.motion.x;
-                m_mouseState.y = event.motion.y;
-                m_mouseState.deltaX = event.motion.xrel;
-                m_mouseState.deltaY = event.motion.yrel;
-                break;
+        // --- Mouse ---
+        case SDL_MOUSEMOTION:
+            m_mouseState.x = (float)event.motion.x;
+            m_mouseState.y = (float)event.motion.y;
+            m_mouseState.deltaX = (float)event.motion.xrel;
+            m_mouseState.deltaY = (float)event.motion.yrel;
+            break;
 
-            case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                {
-                    Uint8 button = event.button.button;
-                    bool wasPressed = m_mouseState.currentButtons.count(button);
-                    m_mouseState.currentButtons.insert(button);
-                    if (!wasPressed) {
-                        m_mouseState.justPressedButtons.insert(button);
-                         // Update action state if bound
-                         if (m_mouseButtonBindings.count(button)) {
-                             m_actionJustPressed[m_mouseButtonBindings[button]] = true;
-                         }
-                    }
+        case SDL_MOUSEBUTTONDOWN:
+            {
+                Uint8 button = event.button.button;
+                bool wasPressed = m_mouseState.currentButtons.count(button);
+                m_mouseState.currentButtons.insert(button);
+                if (!wasPressed) {
+                    m_mouseState.justPressedButtons.insert(button);
                 }
-                break;
+            }
+            break;
 
-            case SDL_EVENT_MOUSE_BUTTON_UP:
-                 {
-                    Uint8 button = event.button.button;
-                     if (m_mouseState.currentButtons.count(button)) {
-                         m_mouseState.currentButtons.erase(button);
-                         m_mouseState.justReleasedButtons.insert(button);
-                          // Update action state if bound
-                          if (m_mouseButtonBindings.count(button)) {
-                              m_actionJustReleased[m_mouseButtonBindings[button]] = true;
-                          }
-                     }
+        case SDL_MOUSEBUTTONUP:
+             {
+                Uint8 button = event.button.button;
+                 if (m_mouseState.currentButtons.count(button)) {
+                     m_mouseState.currentButtons.erase(button);
+                     m_mouseState.justReleasedButtons.insert(button);
                  }
-                break;
+            }
+            break;
 
-            case SDL_EVENT_MOUSE_WHEEL:
-                 // SDL3 uses float precision for wheel events
-                 m_mouseState.scrollX = event.wheel.x;
-                 m_mouseState.scrollY = event.wheel.y;
-                break;
+        case SDL_MOUSEWHEEL:
+             // SDL2 uses int for wheel events
+             m_mouseState.scrollX = (float)event.wheel.x;
+             m_mouseState.scrollY = (float)event.wheel.y;
+            break;
 
-            // --- Gamepad ---
-            case SDL_EVENT_GAMEPAD_ADDED:
-                 addGamepad(event.gdevice.which);
-                break;
+        // --- Gamepad ---
+        case SDL_CONTROLLERDEVICEADDED:
+             addGamepad(event.cdevice.which);
+            break;
 
-            case SDL_EVENT_GAMEPAD_REMOVED:
-                removeGamepad(event.gdevice.which);
-                break;
+        case SDL_CONTROLLERDEVICEREMOVED:
+            removeGamepad(event.cdevice.which);
+            break;
 
-            case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-                // Only process if it's our active gamepad
-                if (m_gamepadState.isConnected && event.gbutton.which == m_gamepadState.instanceId) {
-                    SDL_GamepadButton button = (SDL_GamepadButton)event.gbutton.button;
-                    bool wasPressed = m_gamepadState.currentButtons[button]; // operator[] creates if not exist
-                    m_gamepadState.currentButtons[button] = true;
-                    if (!wasPressed) {
-                        m_gamepadState.justPressedButtons[button] = true;
-                         // Update action state if bound
-                         if (m_gamepadButtonBindings.count(button)) {
-                              m_actionJustPressed[m_gamepadButtonBindings[button]] = true;
-                         }
-                    }
+        case SDL_CONTROLLERBUTTONDOWN:
+            // Only process if it's our active gamepad
+            if (m_gamepadState.isConnected && event.cbutton.which == m_gamepadState.instanceId) {
+                SDL_GameControllerButton button = (SDL_GameControllerButton)event.cbutton.button;
+                bool wasPressed = m_gamepadState.currentButtons[button]; // operator[] creates if not exist
+                m_gamepadState.currentButtons[button] = true;
+                if (!wasPressed) {
+                    m_gamepadState.justPressedButtons[button] = true;
                 }
-                break;
+            }
+            break;
 
-            case SDL_EVENT_GAMEPAD_BUTTON_UP:
-                if (m_gamepadState.isConnected && event.gbutton.which == m_gamepadState.instanceId) {
-                    SDL_GamepadButton button = (SDL_GamepadButton)event.gbutton.button;
-                     if (m_gamepadState.currentButtons[button]) { // Check if it was actually pressed
-                         m_gamepadState.currentButtons[button] = false;
-                         m_gamepadState.justReleasedButtons[button] = true;
-                          // Update action state if bound
-                          if (m_gamepadButtonBindings.count(button)) {
-                              m_actionJustReleased[m_gamepadButtonBindings[button]] = true;
-                          }
-                     }
-                }
-                break;
+        case SDL_CONTROLLERBUTTONUP:
+            if (m_gamepadState.isConnected && event.cbutton.which == m_gamepadState.instanceId) {
+                SDL_GameControllerButton button = (SDL_GameControllerButton)event.cbutton.button;
+                 if (m_gamepadState.currentButtons.count(button)) { // Check if it was actually pressed
+                     m_gamepadState.currentButtons.erase(button);
+                     m_gamepadState.justReleasedButtons[button] = true;
+                 }
+            }
+            break;
 
-            case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-                if (m_gamepadState.isConnected && event.gaxis.which == m_gamepadState.instanceId) {
-                     SDL_GamepadAxis axis = (SDL_GamepadAxis)event.gaxis.axis;
-                     float value = normalizeAxisValue(event.gaxis.value);
-                     m_gamepadState.axisValues[axis] = value;
+        case SDL_CONTROLLERAXISMOTION:
+            if (m_gamepadState.isConnected && event.caxis.which == m_gamepadState.instanceId) {
+                 SDL_GameControllerAxis axis = (SDL_GameControllerAxis)event.caxis.axis;
+                 float value = normalizeAxisValue(event.caxis.value);
+                 m_gamepadState.axisValues[axis] = value;
 
-                     // Update trigger states specifically
-                     if (axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER) {
-                         m_gamepadState.triggerLeft = value;
-                     } else if (axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) {
-                         m_gamepadState.triggerRight = value;
-                     }
-                }
-                break;
+                 // Update trigger states specifically
+                 if (axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT) {
+                     m_gamepadState.triggerLeft = value;
+                 } else if (axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT) {
+                     m_gamepadState.triggerRight = value;
+                 }
+            }
+            break;
 
-             // Add window events if needed (resize, focus gain/loss)
-             // case SDL_EVENT_WINDOW_RESIZED:
-             // case SDL_EVENT_WINDOW_FOCUS_GAINED:
-             // case SDL_EVENT_WINDOW_FOCUS_LOST:
-        }
+         // Add window events if needed (resize, focus gain/loss)
+         // case SDL_EVENT_WINDOW_RESIZED:
+         // case SDL_EVENT_WINDOW_FOCUS_GAINED:
+         // case SDL_EVENT_WINDOW_FOCUS_LOST:
     }
-
-    // After processing all events, update the continuous "pressed" action states
-    updateActionStates();
 }
 
 void InputManager::updateActionStates() {
@@ -287,9 +266,6 @@ void InputManager::updateActionStates() {
          if (m_gamepadState.triggerRight > 0.5f) {
              // Check if an action like SHOOT is mapped *conceptually* to the trigger
              // This part needs refinement - maybe have specific Trigger Actions?
-             // Or check if SHOOT action is bound to a specific trigger button enum if SDL provides one.
-             // For now, let's assume if SHOOT is bound to *any* gamepad button, the trigger might also activate it.
-             // A better way is needed. Maybe bind GameAction::SHOOT_TRIGGER explicitly?
              // Or simply require game logic to check getGamepadTriggerRight() directly.
              // Let's comment this out for now, logic should check trigger directly.
              // if (m_gamepadButtonBindings.count(SDL_GAMEPAD_BUTTON_INVALID)) { // Find if SHOOT is bound conceptually
@@ -363,23 +339,23 @@ bool InputManager::isKeyJustReleased(SDL_Keycode key) const {
 
 bool InputManager::loadBindings(const std::string& filePath) {
     // TODO: Implement loading bindings from a file (e.g., JSON, INI)
-    std::cerr << "Warning: InputManager::loadBindings('" << filePath << "') not implemented yet." << std::endl;
+    Log::Warning("InputManager::loadBindings('" + filePath + "') not implemented yet.");
     return false;
 }
 
 void InputManager::bindKey(SDL_Keycode key, GameAction action) {
     m_keyBindings[key] = action;
-     // std::cout << "Bound key " << SDL_GetKeyName(key) << " to action " << static_cast<int>(action) << std::endl;
+     // Log::Info("Bound key " + std::string(SDL_GetKeyName(key)) + " to action " + std::to_string(static_cast<int>(action)));
 }
 
 void InputManager::bindMouseButton(Uint8 button, GameAction action) {
     m_mouseButtonBindings[button] = action;
-     // std::cout << "Bound mouse button " << (int)button << " to action " << static_cast<int>(action) << std::endl;
+     // Log::Info("Bound mouse button " + std::to_string(static_cast<int>(button)) + " to action " + std::to_string(static_cast<int>(action)));
 }
 
-void InputManager::bindGamepadButton(SDL_GamepadButton button, GameAction action) {
+void InputManager::bindGamepadButton(SDL_GameControllerButton button, GameAction action) {
      m_gamepadButtonBindings[button] = action;
-     // std::cout << "Bound gamepad button " << SDL_GetGamepadStringForButton(button) << " to action " << static_cast<int>(action) << std::endl;
+     // Log::Info("Bound gamepad button " + std::string(SDL_GameControllerGetStringForButton(button)) + " to action " + std::to_string(static_cast<int>(action)));
 }
 
 void InputManager::unbindKey(SDL_Keycode key) {
@@ -388,7 +364,7 @@ void InputManager::unbindKey(SDL_Keycode key) {
 
 // --- Gamepad Specific ---
 
-float InputManager::getGamepadAxis(SDL_GamepadAxis axis, float deadZone) const {
+float InputManager::getGamepadAxis(SDL_GameControllerAxis axis, float deadZone) const {
     if (!m_gamepadState.isConnected) return 0.0f;
 
     auto it = m_gamepadState.axisValues.find(axis);
@@ -428,12 +404,12 @@ void InputManager::addGamepad(SDL_JoystickID which) {
          return;
      }
 
-     if (!SDL_IsGamepad(which)) {
+     if (!SDL_IsGameController(which)) {
           SDL_Log("InputManager: Device (ID: %d) is not a gamepad.", which);
           return;
      }
 
-     SDL_Gamepad* gamepad = SDL_OpenGamepad(which);
+     SDL_GameController* gamepad = SDL_GameControllerOpen(which);
      if (!gamepad) {
          SDL_Log("InputManager: Could not open gamepad (ID: %d): %s", which, SDL_GetError());
          return;
@@ -451,14 +427,14 @@ void InputManager::addGamepad(SDL_JoystickID which) {
      m_gamepadState.triggerRight = 0.0f;
 
 
-     SDL_Log("InputManager: Gamepad Added (ID: %d, Name: %s)", which, SDL_GetGamepadName(gamepad));
+     SDL_Log("InputManager: Gamepad Added (ID: %d, Name: %s)", which, SDL_GameControllerName(gamepad));
 }
 
 void InputManager::removeGamepad(SDL_JoystickID which) {
      // Only handle removal if it's our active gamepad
      if (m_gamepadState.isConnected && which == m_gamepadState.instanceId) {
-         SDL_Log("InputManager: Gamepad Removed (ID: %d, Name: %s)", which, SDL_GetGamepadName(m_gamepadState.instance));
-         SDL_CloseGamepad(m_gamepadState.instance);
+         SDL_Log("InputManager: Gamepad Removed (ID: %d, Name: %s)", which, SDL_GameControllerName(m_gamepadState.instance));
+         SDL_GameControllerClose(m_gamepadState.instance);
          m_gamepadState.instance = nullptr;
          m_gamepadState.instanceId = 0;
          m_gamepadState.isConnected = false;

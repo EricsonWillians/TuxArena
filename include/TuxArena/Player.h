@@ -1,17 +1,28 @@
 // include/TuxArena/Player.h
 #pragma once
 
-#include "TuxArena/Entity.h" // Base class
+#include "TuxArena/Entity.h"
+#include "TuxArena/Weapon.h"
 #include <string>
+#include <vector>
+#include <memory>
+#include <SDL_render.h> // For SDL_Texture
+
+#include <SDL_render.h> // For SDL_Texture
+
+#include <SDL_render.h> // For SDL_Texture
+
+#include <SDL_render.h> // For SDL_Texture
 
 // Forward Declarations
-struct SDL_Texture; // Avoid including SDL headers in this header if possible
 namespace TuxArena {
     class Renderer;
 }
 
 
 namespace TuxArena {
+
+class Weapon;
 
 class Player : public Entity {
 public:
@@ -23,6 +34,7 @@ public:
     void update(const EntityContext& context) override;
     void render(Renderer& renderer) override;
     void onDestroy(const EntityContext& context) override;
+    void takeDamage(float damage, uint32_t instigatorId) override;
     // virtual void handleCollision(Entity* other, const CollisionResult& result) override; // If needed
     // virtual void serializeState(BitStream& stream, bool isInitialState) const override; // If needed
     // virtual void deserializeState(BitStream& stream, double timestamp) override;       // If needed
@@ -41,10 +53,16 @@ private:
     Vec2 m_aimDirection = {1.0f, 0.0f}; // Direction player is aiming (normalized)
 
     // Combat
-    float m_shootCooldown = 0.2f;    // Seconds between shots
-    float m_shootTimer = 0.0f;       // Time remaining until next shot allowed
+    std::vector<std::unique_ptr<Weapon>> m_weapons;
+    int m_currentWeaponIndex = -1;
     int m_health = 100;
+    bool m_shootInput = false;
     // Add ammo, score, etc.
+
+    // Weapon management
+    void addWeapon(std::unique_ptr<Weapon> weapon);
+    void switchWeapon(int slotIndex);
+    Weapon* getCurrentWeapon() const;
 
     // Rendering
     SDL_Texture* m_playerTexture = nullptr; // Cached texture pointer

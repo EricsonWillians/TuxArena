@@ -1,0 +1,11 @@
+{
+    "name": "Modded Pistol",
+    "type": "PISTOL",
+    "fireRate": 7.0,
+    "projectilesPerShot": 1,
+    "projectileSpeed": 700.0,
+    "projectileDamage": 15.0,
+    "projectileLifetime": 2.5,
+    "spreadAngle": 2.0,
+    "ammoCost": 1
+}

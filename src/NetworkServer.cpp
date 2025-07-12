@@ -1,26 +1,26 @@
 // src/NetworkServer.cpp
 #include "TuxArena/NetworkServer.h"
+#include "SDL2/SDL_net.h"
+#include "TuxArena/Constants.h"
+#include "TuxArena/EntityManager.h"
+#include "TuxArena/MapManager.h"
+#include "TuxArena/ModManager.h"
+#include "TuxArena/EntityManager.h"
+#include "TuxArena/MapManager.h"
+#include "TuxArena/ModManager.h"
+#include "SDL2/SDL_net.h"
 #include "TuxArena/Network.h" // Common definitions
 #include "TuxArena/EntityManager.h"
 #include "TuxArena/MapManager.h"
 #include "TuxArena/ModManager.h"
+#include "TuxArena/Log.h" // For basic logging
+
 // Potentially include specific entity headers if needed for state serialization
 
-#include "SDL3/SDL.h" // For logging, timing (SDL_GetTicks64, etc.)
-#include "SDL3_net/SDL_net.h"
+#include "SDL2/SDL.h" // For logging, timing (SDL_GetTicks64, etc.)
 
-#include <iostream> // For basic logging
 #include <vector>
 #include <cstring> // For memcpy, memset
-
-// --- Basic Logging Helper ---
-namespace Log {
-    static void Info(const std::string& msg) { std::cout << "[INFO] [Server] " << msg << std::endl; }
-    static void Warning(const std::string& msg) { std::cerr << "[WARN] [Server] " << msg << std::endl; }
-    static void Error(const std::string& msg) { std::cerr << "[ERROR] [Server] " << msg << std::endl; }
-}
-// --- End Basic Logging Helper ---
-
 
 namespace TuxArena {
 
@@ -36,7 +36,7 @@ size_t NetworkServer::AddressHasher::operator()(const IPaddress& addr) const {
 
 bool NetworkServer::AddressEqual::operator()(const IPaddress& a, const IPaddress& b) const {
     // Use SDLNet_AddressEqual for reliable comparison
-    return SDLNet_AddressEqual(&a, &b) != 0;
+    return (a.host == b.host && a.port == b.port);
 }
 // --- End Hash and Equal functors ---
 
@@ -53,12 +53,10 @@ NetworkServer::~NetworkServer() {
     }
 }
 
-bool NetworkServer::initialize(uint16_t port,
-                               int maxClients,
-                               EntityManager* entityManager,
-                               MapManager* mapManager,
-                               ModManager* modManager)
+bool NetworkServer::initialize(int port, int maxClients,
+                    EntityManager* entityManager, MapManager* mapManager)
 {
+    Log::Info("NetworkServer::initialize() called with port: " + std::to_string(port) + ", maxClients: " + std::to_string(maxClients));
     if (m_isInitialized) {
         Log::Warning("NetworkServer::initialize called multiple times.");
         return true;
@@ -66,10 +64,9 @@ bool NetworkServer::initialize(uint16_t port,
     Log::Info("Initializing NetworkServer on port " + std::to_string(port) + "...");
 
     m_port = port;
-    m_maxClients = maxClients > 0 ? maxClients : Network::MAX_CLIENTS;
+    m_maxClients = maxClients > 0 ? maxClients : MAX_PLAYERS;
     m_entityManager = entityManager;
     m_mapManager = mapManager;
-    m_modManager = modManager;
 
     // Validate dependencies
     if (!m_entityManager || !m_mapManager /*|| !m_modManager*/) {
@@ -78,15 +75,15 @@ bool NetworkServer::initialize(uint16_t port,
     }
 
     // SDLNet_Init() should have been called in main.cpp
-    if (SDLNet_WasInit() == 0) {
-         Log::Error("SDL_net was not initialized before initializing NetworkServer.");
+    if (SDLNet_Init() == -1) {
+         Log::Error("SDL_net could not be initialized: " + std::string(SDLNet_GetError()));
          return false;
     }
 
     // Open the server socket on the specified port
     m_serverSocket = SDLNet_UDP_Open(m_port);
     if (!m_serverSocket) {
-        Log::Error("Failed to open UDP socket on port " + std::to_string(m_port) + ": " + SDLNet_GetError());
+        Log::Error("Failed to open UDP socket: " + std::string(SDLNet_GetError()));
         return false;
     }
     Log::Info("Server socket opened successfully on port " + std::to_string(m_port));
@@ -94,7 +91,7 @@ bool NetworkServer::initialize(uint16_t port,
     // Allocate a packet buffer for receiving data
     m_recvPacket = SDLNet_AllocPacket(Network::MAX_PACKET_SIZE);
     if (!m_recvPacket) {
-        Log::Error("Failed to allocate receive packet: " + SDLNet_GetError());
+        Log::Error("Failed to allocate receive packet: " + std::string(SDLNet_GetError()));
         SDLNet_UDP_Close(m_serverSocket);
         m_serverSocket = nullptr;
         return false;
@@ -137,7 +134,7 @@ void NetworkServer::shutdown() {
     // Release system pointers (don't delete, just release ownership/reference)
     m_entityManager = nullptr;
     m_mapManager = nullptr;
-    m_modManager = nullptr;
+    
 
     m_isInitialized = false;
     Log::Info("NetworkServer shutdown complete.");
@@ -159,10 +156,10 @@ void NetworkServer::receiveData() {
 
     // numReceived == 0 means no packet available
     // numReceived == -1 means error
-    if (numReceived == -1) {
+    if (SDLNet_UDP_Recv(m_serverSocket, m_recvPacket) == -1) {
         // Don't log constantly if it's just "No packets available" type errors
         // Log real errors if necessary. For now, assume non-critical.
-        // Log::Warning("SDLNet_UDP_Recv error: " + std::string(SDLNet_GetError()));
+        // Log::Warning("NET_UDP_Recv error: " + std::string(SDL_GetError()));
     }
 }
 
@@ -172,6 +169,10 @@ void NetworkServer::handlePacket(UDPpacket* packet) {
     // Get client address
     IPaddress sourceAddress = packet->address;
 
+    // Log every packet received for debugging
+    const char* ipStr = SDLNet_ResolveIP(&sourceAddress);
+    Log::Info("Received packet from " + std::string(ipStr) + ":" + std::to_string(SDLNet_Read16(&sourceAddress.port)) + " with length " + std::to_string(packet->len));
+
     // Find client based on address
     auto mapIt = m_addressToClientIdMap.find(sourceAddress);
     ClientInfo* client = nullptr;
@@ -180,7 +181,7 @@ void NetworkServer::handlePacket(UDPpacket* packet) {
          if (clientIt != m_clients.end()) {
               client = &clientIt->second;
               // Update last packet time for timeout checks
-              client->lastPacketTime = SDL_GetTicks64() / 1000.0; // Store time in seconds
+              client->lastPacketTime = SDL_GetTicks() / 1000.0; // Store time in seconds
          }
     }
 
@@ -215,58 +216,111 @@ void NetworkServer::handlePacket(UDPpacket* packet) {
 
 
 void NetworkServer::handleConnectRequest(UDPpacket* packet, const IPaddress& address) {
-     Log::Info("Received CONNECT_REQUEST from new address.");
-     // TODO: Basic validation (packet length, protocol ID, version)
-     // Example: if (packet->len < sizeof(uint32_t) + sizeof(uint16_t)) return;
-     // uint32_t protoId = deserialize_uint32(packet->data + 1);
-     // uint16_t version = deserialize_uint16(packet->data + 1 + sizeof(uint32_t));
-     // if (protoId != Network::PROTOCOL_ID || version != Network::PROTOCOL_VERSION) { Send REJECT; return; }
+    // Basic validation: MessageType + ProtocolID + Version + at least 1 char for name + null terminator
+    if (packet->len < 1 + sizeof(uint32_t) + sizeof(uint16_t) + 2) {
+        Log::Warning("Received invalid CONNECT_REQUEST (too short).");
+        return;
+    }
 
-     // Check if server is full
-     if (m_clients.size() >= m_maxClients) {
-         Log::Warning("Connection rejected: Server full (" + std::to_string(m_clients.size()) + "/" + std::to_string(m_maxClients) + ").");
-         // TODO: Send REJECT (SERVER_FULL) message
-         return;
-     }
+    int offset = 1; // Start after message type
 
-     // Add or find client entry
-     ClientInfo* client = findOrAddClient(address);
-     if (!client) {
-         Log::Error("Failed to add client entry for new connection.");
-         return; // Could not allocate client info
-     }
+    // 1. Validate Protocol ID and Version
+    uint32_t protoId;
+    memcpy(&protoId, packet->data + offset, sizeof(uint32_t));
+    protoId = SDL_SwapBE32(protoId); // Convert from Big Endian
+    offset += sizeof(uint32_t);
 
-     // Assign player name (assume it's sent after version in request packet)
-     // client->playerName = deserialize_string(packet->data + ...);
-     client->playerName = "Player_" + std::to_string(client->clientId); // Placeholder name
-     client->isConnected = true; // Mark as connected after successful handshake part
-     client->lastPacketTime = SDL_GetTicks64() / 1000.0;
+    uint16_t version;
+    memcpy(&version, packet->data + offset, sizeof(uint16_t));
+    version = SDL_SwapBE16(version); // Convert from Big Endian
+    offset += sizeof(uint16_t);
 
-     Log::Info("Client connected: ID=" + std::to_string(client->clientId) + ", Name=" + client->playerName);
+    if (protoId != Network::PROTOCOL_ID || version != Network::PROTOCOL_VERSION) {
+        Log::Warning("Connection rejected: Invalid protocol or version.");
+        // TODO: Send REJECT (INVALID_PROTOCOL / WRONG_VERSION) message
+        return;
+    }
+
+    // 2. Check if server is full
+    if (m_clients.size() >= static_cast<size_t>(m_maxClients)) {
+        Log::Warning("Connection rejected: Server full (" + std::to_string(m_clients.size()) + "/" + std::to_string(m_maxClients) + ").");
+        // TODO: Send REJECT (SERVER_FULL) message
+        return;
+    }
+
+    // 3. Extract Player Name
+    char playerNameBuffer[256];
+    // Calculate remaining length for the name
+    int nameLen = packet->len - offset;
+    if (nameLen > 255) nameLen = 255; // Prevent buffer overflow
+    strncpy(playerNameBuffer, (char*)packet->data + offset, nameLen);
+    playerNameBuffer[nameLen] = '\0'; // Ensure null termination
+    std::string playerName = playerNameBuffer;
 
 
-     // --- Send Welcome Message ---
-     // Buffer: [MessageType::WELCOME, ClientID, MapName C-String]
-     // Need a robust way to serialize map name and other info.
-     memset(m_sendBuffer, 0, Network::MAX_PACKET_SIZE);
-     m_sendBuffer[0] = static_cast<uint8_t>(Network::MessageType::WELCOME);
-     // Serialize Client ID (example using memcpy - use proper serialization)
-     uint32_t clientIdNet = SDL_Swap32(client->clientId); // Ensure network byte order if needed, though maybe overkill for client ID
-     memcpy(m_sendBuffer + 1, &clientIdNet, sizeof(uint32_t));
-     // Serialize Map Name
-     std::string mapName = m_mapManager ? m_mapManager->getMapName() : "default.tmx"; // Need getMapName() in MapManager
-     strncpy((char*)m_sendBuffer + 1 + sizeof(uint32_t), mapName.c_str(), Network::MAX_PACKET_SIZE - 1 - sizeof(uint32_t) - 1); // Copy with null terminator space
+    // 4. Add or find client entry
+    ClientInfo* client = findOrAddClient(address);
+    if (!client) {
+        Log::Error("Failed to add client entry for new connection.");
+        return; // Could not allocate client info
+    }
 
-     int packetLen = 1 + sizeof(uint32_t) + mapName.length() + 1; // Type + ID + MapName + NullTerminator
-     sendPacket(address, m_sendBuffer, packetLen);
-     Log::Info("Sent WELCOME to client ID " + std::to_string(client->clientId) + " with map: " + mapName);
+    // 5. Finalize Client Setup
+    client->playerName = playerName;
+    client->isConnected = true;
+    client->lastPacketTime = SDL_GetTicks() / 1000.0;
 
-     // TODO: Spawn player entity for this client and send initial state / SPAWN_ENTITY message
-     // Entity* player = m_entityManager->createEntity(EntityType::PLAYER, ...);
-     // client->playerEntity = player; // Associate entity with client
-     // Send SPAWN_ENTITY message for this player to the new client
-     // Send SPAWN_ENTITY messages for all *other* existing entities to the new client
-     // Send SPAWN_ENTITY message for the *new* player to all *other* clients
+    Log::Info("Client connected: ID=" + std::to_string(client->clientId) + ", Name=" + client->playerName);
+
+    // 6. Send Welcome Message
+    // Buffer: [MessageType::WELCOME, ClientID]
+    uint8_t welcomeBuffer[1 + sizeof(uint32_t)];
+    welcomeBuffer[0] = static_cast<uint8_t>(Network::MessageType::WELCOME);
+    uint32_t clientIdNet = SDL_SwapBE32(client->clientId);
+    memcpy(welcomeBuffer + 1, &clientIdNet, sizeof(uint32_t));
+    sendPacket(address, welcomeBuffer, sizeof(welcomeBuffer));
+    Log::Info("Sent WELCOME to client ID " + std::to_string(client->clientId));
+
+    // 7. Send Set Map Message
+    std::string mapName = m_mapManager ? m_mapManager->getMapName() : "default.tmx";
+    size_t mapPacketLen = 1 + mapName.length() + 1;
+    uint8_t mapBuffer[mapPacketLen];
+    mapBuffer[0] = static_cast<uint8_t>(Network::MessageType::SET_MAP);
+    strcpy((char*)mapBuffer + 1, mapName.c_str());
+    sendPacket(address, mapBuffer, mapPacketLen);
+    Log::Info("Sent SET_MAP to client ID " + std::to_string(client->clientId) + " with map: " + mapName);
+
+    // 8. Spawn Player Entity
+    EntityContext playerSpawnContext;
+    playerSpawnContext.entityManager = m_entityManager;
+    playerSpawnContext.mapManager = m_mapManager;
+    playerSpawnContext.isServer = true;
+
+    // TODO: Get spawn point from map
+    Vec2 spawnPos = {100.0f, 100.0f};
+    Entity* player = m_entityManager->createEntity(EntityType::PLAYER, spawnPos, playerSpawnContext);
+    if (player) {
+        client->playerEntity = player;
+        Log::Info("Spawned player entity for client ID " + std::to_string(client->clientId) + ", Entity ID: " + std::to_string(player->getId()));
+
+        // TODO: Send SPAWN_ENTITY messages for all *other* existing entities to the new client
+        // TODO: Send SPAWN_ENTITY message for the *new* player to all *other* clients
+
+        // Send a SPAWN_ENTITY message for the new player to the new client
+        uint8_t spawnBuffer[1 + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(Vec2) + sizeof(float)];
+        spawnBuffer[0] = static_cast<uint8_t>(Network::MessageType::SPAWN_ENTITY);
+        uint32_t entityIdNet = SDL_SwapBE32(player->getId());
+        uint8_t entityType = static_cast<uint8_t>(player->getType());
+        memcpy(spawnBuffer + 1, &entityIdNet, sizeof(uint32_t));
+        memcpy(spawnBuffer + 1 + sizeof(uint32_t), &entityType, sizeof(uint8_t));
+        memcpy(spawnBuffer + 1 + sizeof(uint32_t) + sizeof(uint8_t), &spawnPos, sizeof(Vec2));
+        float rotation = player->getRotation();
+        memcpy(spawnBuffer + 1 + sizeof(uint32_t) + sizeof(uint8_t) + sizeof(Vec2), &rotation, sizeof(float));
+        sendPacket(address, spawnBuffer, sizeof(spawnBuffer));
+
+    } else {
+        Log::Error("Failed to spawn player entity for client ID " + std::to_string(client->clientId));
+    }
 }
 
 void NetworkServer::handleClientInput(UDPpacket* packet, ClientInfo& client) {
@@ -278,14 +332,18 @@ void NetworkServer::handleClientInput(UDPpacket* packet, ClientInfo& client) {
 }
 
 void NetworkServer::handleClientDisconnect(UDPpacket* packet, ClientInfo& client) {
-     Log::Info("Client ID " + std::to_string(client.clientId) + " (" + client.playerName + ") sent DISCONNECT message.");
-     // TODO: Properly handle graceful disconnect
-     // Destroy associated player entity?
-     // if (client.playerEntity && m_entityManager) { m_entityManager->destroyEntity(client.playerEntity->getId()); }
-     removeClient(client.clientId);
+    (void)packet; // Suppress unused parameter warning
+    (void)client; // Suppress unused parameter warning
+    Log::Info("Client ID " + std::to_string(client.clientId) + " (" + client.playerName + ") sent DISCONNECT message.");
+    // TODO: Properly handle graceful disconnect
+    // Destroy associated player entity?
+    // if (client.playerEntity && m_entityManager) { m_entityManager->destroyEntity(client.playerEntity->getId()); }
+    removeClient(client.clientId);
 }
 
 void NetworkServer::handleClientPong(UDPpacket* packet, ClientInfo& client) {
+    (void)packet; // Suppress unused parameter warning
+    (void)client; // Suppress unused parameter warning
     // TODO: Use pong messages to calculate round-trip time (RTT) / latency
     // The pong should contain data sent in the original ping to match them up.
     // Log::Info("Received PONG from client ID " + std::to_string(client.clientId));
@@ -293,45 +351,74 @@ void NetworkServer::handleClientPong(UDPpacket* packet, ClientInfo& client) {
 
 
 void NetworkServer::sendUpdates() {
-    if (!m_isInitialized || m_clients.empty()) return;
+    if (!m_isInitialized) return;
+
+    // Always log the current client count
+    Log::Info("NetworkServer::sendUpdates() called. m_clients.size(): " + std::to_string(m_clients.size()));
 
     // --- Serialize Game State ---
-    // This is a critical part: efficiently pack positions, health, etc.
-    // for all relevant entities into the send buffer. Delta compression is key for performance.
-    // For now, placeholder for simple snapshot.
+    // Buffer: [MessageType::STATE_UPDATE, Timestamp, NumEntities, [Entity1Data], [Entity2Data], ...]
     memset(m_sendBuffer, 0, Network::MAX_PACKET_SIZE);
     m_sendBuffer[0] = static_cast<uint8_t>(Network::MessageType::STATE_UPDATE);
-    // Add timestamp (e.g., server frame number or high-res timer)
-    // uint64_t timestamp = SDL_GetTicks64(); memcpy(m_sendBuffer + 1, &timestamp, sizeof(timestamp));
-    int bytesWritten = 1; // Start after message type // + sizeof(timestamp);
 
-    // Iterate through entities and serialize relevant ones
-    // This needs access to the entity list from EntityManager
-    // if (m_entityManager) {
-    //     for (Entity* entity : m_entityManager->getActiveEntities()) {
-    //          // Check if entity type should be synced
-    //          // Serialize ID, Type, Position, Rotation, Velocity, Health etc.
-    //          // Append serialized data to m_sendBuffer, update bytesWritten
-    //          // Check buffer overflow!
-    //          if (bytesWritten + estimatedSize > Network::MAX_PACKET_SIZE) break;
-    //          // bytesWritten += serializeEntity(entity, m_sendBuffer + bytesWritten);
-    //     }
-    // }
+    // Add timestamp
+    uint64_t timestamp = SDL_GetTicks64();
+    memcpy(m_sendBuffer + 1, &timestamp, sizeof(uint64_t));
+    int bytesWritten = 1 + sizeof(uint64_t);
 
-    // Temporary: Send a minimal placeholder state update
-     bytesWritten = 1 + sizeof(uint64_t); // Type + Placeholder timestamp
-     uint64_t timeNow = SDL_GetTicks64();
-     memcpy(m_sendBuffer + 1, &timeNow, sizeof(timeNow));
-     m_sendBuffer[bytesWritten++] = 0; // Placeholder: Number of entities = 0
+    // Placeholder for number of entities (will fill this in later)
+    uint8_t numEntities = 0;
+    int numEntitiesOffset = bytesWritten; // Store offset to write actual count later
+    bytesWritten += sizeof(uint8_t);
+
+    if (m_entityManager) {
+        for (Entity* entity : m_entityManager->getActiveEntities()) {
+            // Check if there's enough space for another entity (ID, Type, PosX, PosY, Rot)
+            // Assuming: uint32_t ID, uint8_t Type, float PosX, float PosY, float Rot
+            const int ENTITY_DATA_SIZE = sizeof(uint32_t) + sizeof(uint8_t) + (3 * sizeof(float));
+            if (bytesWritten + ENTITY_DATA_SIZE > Network::MAX_PACKET_SIZE) {
+                Log::Warning("NetworkServer::sendUpdates: Packet full, cannot add more entities.");
+                break;
+            }
+
+            // Serialize Entity ID
+            uint32_t entityId = entity->getId();
+            memcpy(m_sendBuffer + bytesWritten, &entityId, sizeof(uint32_t));
+            bytesWritten += sizeof(uint32_t);
+
+            // Serialize Entity Type
+            uint8_t entityType = static_cast<uint8_t>(entity->getType());
+            memcpy(m_sendBuffer + bytesWritten, &entityType, sizeof(uint8_t));
+            bytesWritten += sizeof(uint8_t);
+
+            // Serialize Position (float x, y)
+            Vec2 pos = entity->getPosition();
+            memcpy(m_sendBuffer + bytesWritten, &pos.x, sizeof(float));
+            bytesWritten += sizeof(float);
+            memcpy(m_sendBuffer + bytesWritten, &pos.y, sizeof(float));
+            bytesWritten += sizeof(float);
+
+            // Serialize Rotation (float)
+            float rotation = entity->getRotation();
+            memcpy(m_sendBuffer + bytesWritten, &rotation, sizeof(float));
+            bytesWritten += sizeof(float);
+
+            numEntities++;
+        }
+    }
+
+    // Write the actual number of entities into the packet
+    memcpy(m_sendBuffer + numEntitiesOffset, &numEntities, sizeof(uint8_t));
 
     // --- Broadcast State ---
-    if (bytesWritten > 1) { // Only send if there's actual data (beyond type)
+    if (!m_clients.empty()) { // Only send if there are clients to send to
         broadcastPacket(m_sendBuffer, bytesWritten);
+        // Log::Info("Server sent STATE_UPDATE with " + std::to_string(numEntities) + " entities, size: " + std::to_string(bytesWritten) + " bytes.");
     }
+} // End of sendUpdates()
 
     // TODO: Send reliable messages (spawn/destroy events) separately with ACK handling
     // TODO: Send periodic PING messages
-}
 
 void NetworkServer::checkTimeouts(double currentTime) {
     if (!m_isInitialized) return;
@@ -360,24 +447,23 @@ bool NetworkServer::sendPacket(const IPaddress& dest, const uint8_t* data, int l
         return false;
     }
 
-    // Need a UDPpacket structure for sending
-    // It's often efficient to reuse a single allocated packet structure
-    static UDPpacket* sendPkt = SDLNet_AllocPacket(Network::MAX_PACKET_SIZE); // Static or member? Careful with threading.
+    UDPpacket* sendPkt = SDLNet_AllocPacket(len);
     if (!sendPkt) {
-        Log::Error("Failed to allocate static send packet!");
-        return false; // Cannot allocate packet struct
+        Log::Error("Failed to allocate send packet!");
+        return false;
     }
 
     sendPkt->address = dest;
     sendPkt->len = len;
-    memcpy(sendPkt->data, data, len); // Copy data to packet buffer
+    memcpy(sendPkt->data, data, len);
 
-    int sent = SDLNet_UDP_Send(m_serverSocket, -1, sendPkt); // -1 means use pkt->address
-    // Note: SDLNet_UDP_Send returns 1 on success, 0 on failure. It doesn't queue.
-    if (sent == 0) {
+    if (SDLNet_UDP_Send(m_serverSocket, -1, sendPkt) == 0) {
         Log::Warning("SDLNet_UDP_Send failed: " + std::string(SDLNet_GetError()));
+        SDLNet_FreePacket(sendPkt);
         return false;
     }
+
+    SDLNet_FreePacket(sendPkt);
     return true;
 }
 
@@ -388,7 +474,7 @@ void NetworkServer::broadcastPacket(const uint8_t* data, int len, const IPaddres
     for (auto const& [clientId, clientInfo] : m_clients) {
         if (clientInfo.isConnected) {
              // Check if this client should be excluded
-             if (excludeClientAddress && SDLNet_AddressEqual(&clientInfo.address, excludeClientAddress)) {
+             if (excludeClientAddress && (clientInfo.address.host == excludeClientAddress->host && clientInfo.address.port == excludeClientAddress->port)) {
                  continue; // Skip excluded client
              }
              sendPacket(clientInfo.address, data, len);
@@ -416,15 +502,15 @@ ClientInfo* NetworkServer::findOrAddClient(const IPaddress& address) {
     }
 
     // If not found, treat as a new client (check capacity first - done in handleConnectRequest)
-    uint32_t newClientId = m_nextClientId++; // Assign next available ID
-    if (newClientId == 0) { /* Handle wrap around if necessary */ m_nextClientId = 1; newClientId = m_nextClientId++; }
+    uint32_t newClientId = m_nextClientId++;
+    Log::Info("Attempting to add new client with ID: " + std::to_string(newClientId));
 
     ClientInfo newClient;
     newClient.clientId = newClientId;
     newClient.address = address;
     newClient.isConnected = false; // Not fully connected until welcome sequence complete
     newClient.lastInputSequence = 0;
-    newClient.lastPacketTime = SDL_GetTicks64() / 1000.0;
+    newClient.lastPacketTime = SDL_GetTicks() / 1000.0;
 
     // Insert into main client map
     auto insertResult = m_clients.insert({newClientId, newClient});
@@ -458,6 +544,10 @@ void NetworkServer::removeClient(uint32_t clientId) {
 
 // --- State Serialization Placeholder ---
 int NetworkServer::serializeGameState(uint8_t* buffer, int bufferSize) {
+    (void)buffer; // Suppress unused parameter warning
+    (void)bufferSize; // Suppress unused parameter warning
+    (void)buffer; // Suppress unused parameter warning
+    (void)bufferSize; // Suppress unused parameter warning
     // TODO: Implement actual game state serialization
     // - Iterate through relevant entities in m_entityManager
     // - Write ID, Type, Position, Rotation, Velocity, Health, etc.

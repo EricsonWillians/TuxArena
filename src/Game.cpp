@@ -20,13 +20,32 @@
 #include "TuxArena/NetworkServer.h"
 #include "TuxArena/Player.h"      // For spawning player (though moved)
 #include "TuxArena/Renderer.h"
+#include "TuxArena/WeaponManager.h"
 
 // SDL Includes
-#include "SDL3/SDL.h"
-#include "SDL3/SDL_timer.h" // For SDL_GetPerformanceCounter/Frequency
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_timer.h" // For SDL_GetPerformanceCounter/Frequency
 
 
 namespace TuxArena {
+
+// Helper function for string representation of GameState (for logging)
+std::string GameStateToString(GameState state) {
+    switch (state) {
+        case GameState::INITIALIZING: return "INITIALIZING";
+        case GameState::MAIN_MENU: return "MAIN_MENU";
+        case GameState::LOBBY: return "LOBBY";
+        case GameState::CONNECT_TO_SERVER: return "CONNECT_TO_SERVER";
+        case GameState::HOSTING_GAME: return "HOSTING_GAME";
+        case GameState::CHARACTER_SELECTION: return "CHARACTER_SELECTION";
+        case GameState::LOADING: return "LOADING";
+        case GameState::PLAYING: return "PLAYING";
+        case GameState::PAUSED: return "PAUSED";
+        case GameState::ERROR_STATE: return "ERROR_STATE";
+        case GameState::SHUTTING_DOWN: return "SHUTTING_DOWN";
+        default: return "UNKNOWN_STATE";
+    }
+}
 
 // --- Game Constants (Consider moving to Constants.h or AppConfig) ---
 const double MAX_FRAME_TIME = 0.1; // Max delta time to prevent spiral of death (100ms)
@@ -36,18 +55,6 @@ const double SERVER_FIXED_DELTA_TIME = 1.0 / SERVER_TICK_RATE;
 // Network send rates (updates per second)
 const double SERVER_STATE_SEND_RATE = 30.0;
 const double CLIENT_INPUT_SEND_RATE = 60.0;
-
-
-// --- Game State Machine (Placeholder) ---
-enum class GameState {
-    INITIALIZING,
-    // MAIN_MENU, // Example
-    LOADING,     // Waiting for connection / map data
-    PLAYING,
-    PAUSED,
-    SHUTTING_DOWN,
-    ERROR_STATE
-};
 
 
 // --- Game Class Implementation ---
@@ -73,113 +80,109 @@ bool Game::init(const AppConfig& config) {
         return true;
     }
 
-    m_config = config;
-    m_gameState = GameState::INITIALIZING;
-    Log::Info("Initializing Game systems...");
-    Log::Info(m_config.isServer ? "Mode: Server" : "Mode: Client");
-
-    m_perfFrequency = SDL_GetPerformanceFrequency();
-    if (m_perfFrequency == 0) {
-         Log::Error("SDL High Performance Counter not available!");
-         // Fallback or error? For now, log error and continue (timing will be less accurate)
-         m_perfFrequency = 1000; // Assume millisecond precision as fallback
-    }
-
-
     try {
-        // --- System Initialization Order ---
-        // Initialize systems sequentially, checking each step. More robust than one giant try-catch.
+        m_config = config;
+        pushState(GameState::INITIALIZING);
 
-        // 1. Mod Manager
+        // Initialize server IP buffer from config
+        strncpy(m_serverIpBuffer, m_config.serverIp.c_str(), sizeof(m_serverIpBuffer) - 1);
+        m_serverIpBuffer[sizeof(m_serverIpBuffer) - 1] = '\0'; // Ensure null termination
+
+        Log::Info("Initializing Game systems...");
+        Log::Info(m_config.isServer ? "Mode: Dedicated Server" : "Mode: Client");
+
+        // Initialize performance counter
+        m_perfFrequency = SDL_GetPerformanceFrequency();
+        if (m_perfFrequency == 0) {
+            Log::Error("SDL High Performance Counter not available");
+            m_perfFrequency = 1000; // Fallback to millisecond precision
+        }
+
+        // Initialize core systems that are common to both client and server
         Log::Info("Initializing ModManager...");
         m_modManager = std::make_unique<ModManager>();
-        if (!m_modManager->initialize("mods")) { Log::Warning("ModManager initialization failed. Continuing without mods."); }
-        m_modManager->triggerOnInit(); // Call mod hooks early
-
-        // 2. Renderer (Client only)
-        if (!m_config.isServer) {
-             Log::Info("Initializing Renderer...");
-             m_renderer = std::make_unique<Renderer>();
-             if (!m_renderer->initialize("TuxArena", m_config.windowWidth, m_config.windowHeight, m_config.vsyncEnabled)) {
-                 throw std::runtime_error("Renderer initialization failed."); // Renderer is critical for client
-             }
+        if (!m_modManager->initialize("mods")) {
+            Log::Warning("ModManager initialization failed. Continuing without mods.");
+        } else {
+            m_modManager->triggerOnInit();
         }
 
-        // 3. Input Manager (Client only)
-         if (!m_config.isServer) {
-             Log::Info("Initializing InputManager...");
-             m_inputManager = std::make_unique<InputManager>();
-             // TODO: Load keybindings from config?
-         }
+        Log::Info("Initializing AssetManager...");
+        m_assetManager = std::make_unique<AssetManager>();
+        m_assetManager->initialize(m_modManager.get());
 
-        // 4. Map Manager
         Log::Info("Initializing MapManager...");
         m_mapManager = std::make_unique<MapManager>();
-        if (!m_mapManager->loadMap(m_config.mapName)) {
-             // Map is usually critical for both client and server
-             throw std::runtime_error("Failed to load initial map: " + m_config.mapName);
-        }
-        Log::Info("Map '" + m_mapManager->getMapName() + "' loaded.");
 
-
-        // 5. Entity Manager
         Log::Info("Initializing EntityManager...");
         m_entityManager = std::make_unique<EntityManager>();
-        if (!m_entityManager->initialize(m_mapManager.get())) {
-             throw std::runtime_error("EntityManager initialization failed.");
-        }
 
-        // 6. Networking (Server OR Client)
+        // If this is a dedicated server, initialize server-specific components and we're done
         if (m_config.isServer) {
-            Log::Info("Initializing NetworkServer...");
+            Log::Info("Initializing NetworkServer for dedicated mode...");
             m_networkServer = std::make_unique<NetworkServer>();
             if (!m_networkServer->initialize(m_config.serverPort, m_config.serverMaxPlayers,
-                                              m_entityManager.get(), m_mapManager.get(), m_modManager.get())) {
-                 throw std::runtime_error("NetworkServer initialization failed.");
+                                           m_entityManager.get(), m_mapManager.get())) {
+                throw std::runtime_error("Dedicated NetworkServer initialization failed");
             }
-            m_gameState = GameState::PLAYING; // Server starts in playing state, waiting for clients
+            popState(); // Pop INITIALIZING
+            pushState(GameState::PLAYING); // Dedicated server goes straight to playing
+        }
+        // Otherwise, initialize all the client-side systems
+        else {
+            Log::Info("Initializing Renderer...");
+            m_renderer = std::make_unique<Renderer>();
+            if (!m_renderer->initialize("TuxArena", m_config.windowWidth, m_config.windowHeight, m_config.vsyncEnabled)) {
+                throw std::runtime_error("Renderer initialization failed");
+            }
 
-        } else { // Client
-             Log::Info("Initializing NetworkClient...");
-             m_networkClient = std::make_unique<NetworkClient>();
-             if (!m_networkClient->initialize(m_entityManager.get(), m_inputManager.get(),
-                                               m_mapManager.get(), m_modManager.get())) {
-                 throw std::runtime_error("NetworkClient initialization failed.");
-             }
-             // Attempt connection immediately
-             Log::Info("Attempting connection to " + m_config.serverIp + ":" + std::to_string(m_config.serverPort) + "...");
-             m_gameState = GameState::LOADING; // Client starts in loading/connecting state
-             if (!m_networkClient->connect(m_config.serverIp, m_config.serverPort, m_config.playerName)) {
-                  Log::Warning("Connection attempt failed immediately (e.g., resolve error). Client state: " + m_networkClient->getStatusString());
-                  // Update state based on connect result if it provides immediate failure info
-                  if (m_networkClient->getConnectionState() == ConnectionState::CONNECTION_FAILED) {
-                       m_gameState = GameState::ERROR_STATE; // Or back to MainMenu if implemented
-                  }
-             }
+            Log::Info("Initializing ParticleManager...");
+            m_particleManager = std::make_unique<ParticleManager>();
+
+            Log::Info("Initializing InputManager...");
+            m_inputManager = std::make_unique<InputManager>();
+
+            Log::Info("Initializing CharacterManager...");
+            m_characterManager = std::make_unique<CharacterManager>();
+            if (!m_characterManager->initialize(m_renderer.get(), m_modManager.get())) {
+                throw std::runtime_error("CharacterManager initialization failed");
+            }
+
+            Log::Info("Initializing UIManager...");
+            m_uiManager = std::make_unique<UIManager>(this);
+            if (!m_uiManager->initialize(m_renderer->getSDLWindow(), m_renderer->getSDLRenderer())) {
+                throw std::runtime_error("UIManager initialization failed");
+            }
+
+            // Find available maps for client UI
+            findAvailableMaps();
+            popState(); // Pop INITIALIZING
+            pushState(GameState::MAIN_MENU);
         }
 
-        // --- Initial Entity Spawning Deferred ---
-        // Server spawns entities as clients connect or based on map data after init.
-        // Client waits for server SPAWN messages.
+        if (m_modManager) {
+            m_modManager->triggerOnGameInit();
+        }
 
+        m_isInitialized = true;
+        m_isRunning = true;
+        m_lastFrameTime = SDL_GetPerformanceCounter();
 
-        // Trigger ModAPI hook after all core systems are ready
-        if (m_modManager) { m_modManager->triggerOnGameInit(); }
-
-    } catch (const std::exception& e) {
-        Log::Error("FATAL ERROR during Game::init(): " + std::string(e.what()));
-        m_gameState = GameState::ERROR_STATE;
-        // Attempt partial shutdown ONLY of systems known to be initialized
-        // This requires tracking init status per system or careful ordering in shutdown
-        shutdown(); // Call full shutdown for simplicity, it checks internal init flags
-        return false; // Signal failure to main()
+        Log::Info("Game initialization successful. State: " + GameStateToString(currentState()));
+        return true;
     }
-
-    m_isInitialized = true;
-    m_isRunning = true; // Main loop flag
-    m_lastFrameTime = SDL_GetPerformanceCounter();
-    Log::Info("Game initialization successful. Game state: " + std::to_string(static_cast<int>(m_gameState)));
-    return true;
+    catch (const std::exception& e) {
+        Log::Error("FATAL ERROR during Game::init(): " + std::string(e.what()));
+        pushState(GameState::ERROR_STATE);
+        shutdown();
+        return false;
+    }
+    catch (...) {
+        Log::Error("FATAL ERROR during Game::init(): Unknown exception");
+        pushState(GameState::ERROR_STATE);
+        shutdown();
+        return false;
+    }
 }
 
 
@@ -226,7 +229,7 @@ void Game::run() {
              // Example: Basic SDL quit event check for dedicated server window
              SDL_Event event;
              while(SDL_PollEvent(&event)) {
-                 if (event.type == SDL_EVENT_QUIT) { m_isRunning = false; }
+                 if (event.type == SDL_QUIT) { m_isRunning = false; }
              }
         }
         // Exit loop immediately if quit requested
@@ -362,6 +365,36 @@ void Game::update(double deltaTime) {
 }
 
 
+
+
+void Game::renderNonPlayingState() {
+     // Example: Render simple status messages based on state
+     std::string statusText = "Initializing...";
+     TuxArena::Color color = {200, 200, 200, 255}; // Grey
+
+     switch(m_gameState) {
+          case GameState::LOADING:
+               statusText = "Loading / " + (m_networkClient ? m_networkClient->getStatusString() : "Connecting...");
+               break;
+          case GameState::ERROR_STATE:
+               statusText = "Error: " + (m_networkClient ? m_networkClient->getStatusString() : "Initialization Failed");
+               color = {255, 50, 50, 255}; // Red
+               break;
+          case GameState::PAUSED:
+               statusText = "Paused";
+               break;
+          // Add MainMenu, etc.
+          default:
+               statusText = "Unknown State: " + std::to_string(static_cast<int>(m_gameState));
+               break;
+     }
+     if (m_renderer) {
+          // Center text roughly? Requires window dimensions. Assume defaults for now.
+          m_renderer->drawText(statusText, 100, m_config.windowHeight / 2.0f, "assets/fonts/nokia.ttf", 24, color);
+     }
+}
+
+
 void Game::render() {
     // Assumes Renderer exists (Client only)
     if (!m_renderer) return;
@@ -399,7 +432,7 @@ void Game::render() {
 
     // --- Render elements common to multiple states ---
     // Render Mods (might draw overlay UI)
-    if (m_modManager) { m_modManager->triggerOnRender(m_renderer.get()); }
+    if (m_modManager) { m_modManager->triggerOnUpdate(0.0f); } // TODO: Pass proper delta time
 
     // Render Debug Info (if enabled)
     // if (m_debugEnabled) renderDebug();
@@ -408,32 +441,49 @@ void Game::render() {
     m_renderer->present(); // Swap buffers
 }
 
-void Game::renderNonPlayingState() {
-     // Example: Render simple status messages based on state
-     std::string statusText = "Initializing...";
-     SDL_Color color = {200, 200, 200, 255}; // Grey
-
-     switch(m_gameState) {
-          case GameState::LOADING:
-               statusText = "Loading / " + (m_networkClient ? m_networkClient->getStatusString() : "Connecting...");
-               break;
-          case GameState::ERROR_STATE:
-               statusText = "Error: " + (m_networkClient ? m_networkClient->getStatusString() : "Initialization Failed");
-               color = {255, 50, 50, 255}; // Red
-               break;
-          case GameState::PAUSED:
-               statusText = "Paused";
-               break;
-          // Add MainMenu, etc.
-          default:
-               statusText = "Unknown State: " + std::to_string(static_cast<int>(m_gameState));
-               break;
-     }
-     if (m_renderer) {
-          // Center text roughly? Requires window dimensions. Assume defaults for now.
-          m_renderer->drawText(statusText, 100, m_config.windowHeight / 2.0f, "assets/fonts/nokia.ttf", 24, color);
-     }
+void Game::pushState(GameState state) {
+    m_gameStateStack.push_back(state);
 }
+
+void Game::popState() {
+    if (!m_gameStateStack.empty()) {
+        m_gameStateStack.pop_back();
+    }
+}
+
+GameState Game::currentState() const {
+    if (!m_gameStateStack.empty()) {
+        return m_gameStateStack.back();
+    }
+    return GameState::SHUTTING_DOWN;
+}
+
+#include <dirent.h>
+
+void Game::findAvailableMaps() {
+    m_availableMaps.clear();
+    std::string mapsPath = "maps";
+
+    DIR* dir = opendir(mapsPath.c_str());
+    if (dir) {
+        struct dirent* ent;
+        while ((ent = readdir(dir)) != NULL) {
+            std::string fileName = ent->d_name;
+            if (fileName.size() > 4 && fileName.substr(fileName.size() - 4) == ".tmx") {
+                m_availableMaps.push_back(fileName);
+            }
+        }
+        closedir(dir);
+
+        // Sort maps alphabetically for consistent display
+        std::sort(m_availableMaps.begin(), m_availableMaps.end());
+
+        Log::Info("Found " + std::to_string(m_availableMaps.size()) + " map(s)");
+    } else {
+        Log::Warning("Maps directory not found: " + mapsPath);
+    }
+}
+
 
 
 // --- Network Update Logic ---
@@ -472,9 +522,10 @@ void Game::networkUpdateSend(double currentTime, double& lastSendTime) {
 
 void Game::handleInput() {
     if (m_inputManager) {
-        m_inputManager->pollEvents();
-        // Handle global inputs not tied to player entity, e.g., pause menu
-        // if (m_inputManager->isActionJustPressed(GameAction::PAUSE_MENU)) { togglePause(); }
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            m_inputManager->processSDLEvent(event);
+        }
     }
 }
 

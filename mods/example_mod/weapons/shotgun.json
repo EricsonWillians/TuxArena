@@ -1,0 +1,11 @@
+{
+    "name": "Modded Shotgun",
+    "type": "SHOTGUN",
+    "fireRate": 1.0,
+    "projectilesPerShot": 10,
+    "projectileSpeed": 500.0,
+    "projectileDamage": 5.0,
+    "projectileLifetime": 1.0,
+    "spreadAngle": 30.0,
+    "ammoCost": 1
+}

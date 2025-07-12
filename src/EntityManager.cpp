@@ -1,4 +1,5 @@
-#include <TuxArena/EntityManager.h> // Header for this implementation file
+// src/EntityManager.cpp
+#include "TuxArena/EntityManager.h" // Header for this implementation file
 
 // Standard Library Includes
 #include <algorithm> // For std::remove_if, std::find_if
@@ -7,11 +8,13 @@
 #include <memory>    // For std::unique_ptr, std::make_unique
 #include <set>       // For efficient processing of destruction queue
 #include <stdexcept> // For std::runtime_error (optional for more severe errors)
+#include <functional> // For std::function
 
 // Project-Specific Includes
 #include "TuxArena/Entity.h"      // Base entity class and EntityContext
 #include "TuxArena/MapManager.h"  // Needed for initialization
 #include "TuxArena/Renderer.h"    // Needed for render methods
+#include "TuxArena/Log.h"
 
 // --- Include Headers for ALL Derived Entity Types ---
 // These are required for the factory method (createEntity).
@@ -23,23 +26,14 @@
 
 namespace TuxArena {
 
-// --- Basic Logging Helper (Replace with a real logging library) ---
-namespace Log {
-    static void Info(const std::string& msg) { std::cout << "[INFO] " << msg << std::endl; }
-    static void Warning(const std::string& msg) { std::cerr << "[WARN] " << msg << std::endl; }
-    static void Error(const std::string& msg) { std::cerr << "[ERROR] " << msg << std::endl; }
-} // namespace Log
-// --- End Basic Logging Helper ---
-
-
 // --- Constructor / Destructor ---
 
 EntityManager::EntityManager() {
-    // Log::Info("EntityManager created.");
+    Log::Info("EntityManager created.");
 }
 
 EntityManager::~EntityManager() {
-    // Log::Info("EntityManager destroyed.");
+    Log::Info("EntityManager destroyed.");
     // Ensure shutdown is called if the user forgets, although explicit call is preferred.
     if (m_isInitialized) {
         Log::Warning("EntityManager destroyed without explicit shutdown() call. Cleaning up...");
@@ -47,14 +41,13 @@ EntityManager::~EntityManager() {
     }
 }
 
-// --- Initialization / Shutdown ---
-
 bool EntityManager::initialize(MapManager* mapManager) {
+    Log::Info("EntityManager::initialize() called.");
     if (m_isInitialized) {
         Log::Warning("EntityManager::initialize called multiple times.");
         return true;
     }
-    // Log::Info("Initializing EntityManager...");
+    Log::Info("Initializing EntityManager...");
     m_mapManager = mapManager; // Store pointer to map manager
 
     // Reset state in case initialize is called after a shutdown
@@ -64,7 +57,7 @@ bool EntityManager::initialize(MapManager* mapManager) {
     m_nextEntityId = 1; // Reset ID counter
 
     m_isInitialized = true;
-    // Log::Info("EntityManager initialized successfully.");
+    Log::Info("EntityManager initialized successfully.");
     return true;
 }
 
@@ -72,23 +65,27 @@ void EntityManager::shutdown() {
     if (!m_isInitialized) {
         return;
     }
-    // Log::Info("Shutting down EntityManager...");
+    Log::Info("Shutting down EntityManager...");
 
+    clearAllEntities(); // Use the new clear function for consistency
+
+    m_mapManager = nullptr; // Release pointer to map manager
+    m_isInitialized = false;
+    Log::Info("EntityManager shutdown complete.");
+}
+
+void EntityManager::clearAllEntities() {
+    Log::Info("Clearing all entities from EntityManager...");
     // Process any pending destructions first, calling onDestroy hooks
-    // Note: Requires a valid context. We might use the last stored one or a default.
-    // If called outside the main loop, context might be invalid.
-    // For simplicity, we'll clear directly here. A more robust shutdown
-    // might process the queue one last time if a valid context can be provided.
-    // processDestructionQueue(); // Requires valid context
+    // This is important to ensure entities clean up their resources before being deleted.
+    processDestructionQueue();
 
     // Clear entity collections. unique_ptr handles deletion.
     m_entityMap.clear();   // Clear the lookup map first
     m_entities.clear();    // This destroys all owned Entity objects
     m_destructionQueue.clear(); // Clear any remaining queued IDs
-
-    m_mapManager = nullptr; // Release pointer to map manager
-    m_isInitialized = false;
-    // Log::Info("EntityManager shutdown complete.");
+    m_nextEntityId = 1; // Reset ID counter after clearing all entities
+    m_player = nullptr; // Ensure player pointer is null after clearing
 }
 
 // --- Entity Creation / Destruction ---
@@ -98,7 +95,8 @@ Entity* EntityManager::createEntity(EntityType type,
                                     const EntityContext& context, // Context needed for initialize()
                                     float rotation,
                                     const Vec2& velocity,
-                                    const Vec2& size)
+                                    const Vec2& size,
+                                    uint32_t forceId) // New parameter to force ID
 {
     if (!m_isInitialized) {
         Log::Error("EntityManager::createEntity called before initialization.");
@@ -116,7 +114,7 @@ Entity* EntityManager::createEntity(EntityType type,
                 newEntity = std::make_unique<Player>(this);
                 break;
             case EntityType::PROJECTILE_BULLET:
-                newEntity = std::make_unique<ProjectileBullet>(this);
+                newEntity = std::make_unique<ProjectileBullet>(this, &m_particleManager, position.x, position.y, rotation, velocity.x, size.x); // Assuming velocity.x is speed, size.x is damage
                 break;
             // Add cases for other entity types here...
             // case EntityType::ITEM_HEALTH:
@@ -136,7 +134,7 @@ Entity* EntityManager::createEntity(EntityType type,
     }
 
     // --- Assign ID and Initial State ---
-    uint32_t newId = assignNextId();
+    uint32_t newId = (forceId == 0) ? assignNextId() : forceId; // Use forced ID or assign new
     if (newId == 0) { // Check if ID assignment failed (e.g., wrapped around and hit 0)
         Log::Error("Failed to assign a valid new entity ID.");
         return nullptr; // Cannot proceed without a valid ID
@@ -174,29 +172,21 @@ Entity* EntityManager::createEntity(EntityType type,
     }
 
 
-    // Log::Info("Created Entity ID: " + std::to_string(newId) + ", Type: " + std::to_string(static_cast<int>(type)));
+    Log::Info("Created Entity ID: " + std::to_string(newId) + ", Type: " + std::to_string(static_cast<int>(type)));
     return rawPtr; // Return the non-owning raw pointer
 }
 
 void EntityManager::destroyEntity(uint32_t id) {
-    if (!m_isInitialized || id == 0) return; // Ignore requests for invalid ID 0
+    m_destructionQueue.push_back(id);
+}
 
-    // Check if the entity exists before queueing
-    if (m_entityMap.count(id)) {
-         // Avoid adding duplicates to the queue if destroyEntity is called multiple times per frame
-         // Using find is more efficient on vector than iterating manually if queue grows large
-         if (std::find(m_destructionQueue.begin(), m_destructionQueue.end(), id) == m_destructionQueue.end()) {
-              // Log::Info("Queueing Entity ID " + std::to_string(id) + " for destruction.");
-              m_destructionQueue.push_back(id);
-              // Optional: Immediately mark as inactive. This prevents further updates/renders this frame.
-              // Useful if destruction should be immediate visually/logically, even if memory cleanup is deferred.
-              // if (Entity* entity = getEntityById(id)) { // Use getEntityById for safety
-              //     entity->setActive(false);
-              // }
-         }
-    } else {
-         // Log::Warning("Attempted to destroy non-existent or already destroyed entity ID: " + std::to_string(id));
-    }
+void EntityManager::addEntity(std::unique_ptr<Entity> entity) {
+    uint32_t id = assignNextId();
+    entity->setId(id);
+    entity->initialize(m_lastUpdateContext); // Initialize with the last known context
+    m_entityMap[id] = entity.get();
+    m_entities.push_back(std::move(entity));
+    Log::Info("Added entity with ID: " + std::to_string(id) + " to EntityManager.");
 }
 
 Entity* EntityManager::getEntityById(uint32_t id) const {
@@ -215,68 +205,32 @@ Entity* EntityManager::getEntityById(uint32_t id) const {
 // --- Update / Render ---
 
 void EntityManager::update(const EntityContext& context) {
-    if (!m_isInitialized) return;
+    m_lastUpdateContext = context; // Store for deferred destruction
 
-    // Store the context in case onDestroy needs it during processDestructionQueue
-    m_lastUpdateContext = context;
-
-    // Update all active entities.
-    // Using an index loop avoids iterator invalidation if entities are added during update,
-    // although ideally entities shouldn't add others directly in their update loop
-    // without careful consideration. It processes only entities present at the start.
-    size_t initialSize = m_entities.size();
-    for (size_t i = 0; i < initialSize; ++i) {
-        // Use .get() on unique_ptr, check for null just in case (shouldn't happen)
-        if (Entity* entity = m_entities[i].get()) {
-            // Only update active entities that are NOT already queued for destruction
-            if (entity->isActive()) {
-                 bool destructionQueued = false;
-                 // Check destruction queue efficiently (consider set lookup if queue gets large)
-                 for (uint32_t idToDestroy : m_destructionQueue) {
-                      if (entity->getId() == idToDestroy) {
-                           destructionQueued = true;
-                           break;
-                      }
-                 }
-
-                 if (!destructionQueued) {
-                     try {
-                         entity->update(context);
-                     } catch (const std::exception& e) {
-                         Log::Error("Exception during entity update() for ID " + std::to_string(entity->getId()) + ": " + e.what());
-                         // Consider destroying the problematic entity to prevent further errors
-                         // destroyEntity(entity->getId());
-                     }
-                 }
-            }
+    for (auto& entity : m_entities) {
+        if (entity && entity->isActive()) {
+            entity->update(context);
         }
     }
 
-    // Process entities marked for destruction AFTER the main update loop
+    m_particleManager.update(context.deltaTime);
+
     processDestructionQueue();
 }
 
 void EntityManager::render(Renderer& renderer) {
-    if (!m_isInitialized) return;
-
-    // Render all active entities. Add view culling for optimization later.
-    for (const auto& entityPtr : m_entities) {
-        // Check unique_ptr itself and the entity's active status
-        if (entityPtr && entityPtr->isActive()) {
-            // TODO: Add frustum/view culling check here
-            // if (renderer.isVisible(entityPtr->getAABB())) {
-            try {
-                entityPtr->render(renderer);
-            } catch (const std::exception& e) {
-                Log::Error("Exception during entity render() for ID " + std::to_string(entityPtr->getId()) + ": " + e.what());
-                // Don't destroy based on render error, might be temporary graphics issue
-            }
-            // }
+    // Render all active entities
+    for (const auto& entity : m_entities) {
+        if (entity && entity->isActive()) {
+            entity->render(renderer);
         }
     }
+
+    m_particleManager.render(renderer);
 }
 
 void EntityManager::renderDebug(Renderer& renderer) {
+     (void)renderer; // Suppress unused parameter warning
      if (!m_isInitialized) return;
      // Render debug info for all active entities
      for (const auto& entityPtr : m_entities) {
@@ -289,32 +243,26 @@ void EntityManager::renderDebug(Renderer& renderer) {
              // renderer.drawRectOutline(&aabb, {0, 255, 0, 150}); // Green outline
          }
      }
-      // Log::Info("Rendered debug info for " + std::to_string(m_entities.size()) + " potential entities.");
+      Log::Info("Rendered debug info for " + std::to_string(m_entities.size()) + " potential entities.");
+}
+
+std::vector<Entity*> EntityManager::getActiveEntities() const {
+    std::vector<Entity*> active_entities;
+    for (const auto& entity : m_entities) {
+        if (entity && entity->isActive()) {
+            active_entities.push_back(entity.get());
+        }
+    }
+    return active_entities;
 }
 
 // --- Internal Methods ---
 
 uint32_t EntityManager::assignNextId() {
-    // WARNING: Server Authoritative IDs Required for Networking!
-    // This simple incrementing scheme is ONLY suitable for single-player
-    // or the server-side instance in a multiplayer game. Clients must
-    // use IDs assigned by the server.
-
-    // Basic overflow check (extremely unlikely with uint32_t, but good practice)
-    if (m_nextEntityId == 0) { // Wrapped around or started at 0
+    if (m_nextEntityId == 0) { // Check if ID counter wrapped around and hit 0
         Log::Warning("Entity ID counter wrapped around or started at 0. Resetting to 1.");
         m_nextEntityId = 1;
-        // Potentially check if ID 1 is already in use if wrapping is possible,
-        // but this indicates a *very* long-running game or excessive entity creation.
-        if (m_entityMap.count(m_nextEntityId)) {
-             Log::Error("CRITICAL: Entity ID counter wrapped and collided with existing ID 1!");
-             // This is a fatal error scenario in most cases.
-             // Throw exception or handle appropriately.
-             // For now, return 0 to signal failure.
-             return 0;
-        }
     }
-    // TODO: Add check for maximum entity count if needed.
     return m_nextEntityId++;
 }
 
@@ -345,7 +293,7 @@ void EntityManager::processDestructionQueue() {
                 }
                 // Remove from the lookup map immediately
                 m_entityMap.erase(entityPtr->getId());
-                // Log::Info("Destroying Entity ID: " + std::to_string(entityPtr->getId()));
+                Log::Info("Destroying Entity ID: " + std::to_string(entityPtr->getId()));
                 return true; // Mark for removal by std::remove_if
             }
             return false; // Keep this entity
@@ -354,7 +302,7 @@ void EntityManager::processDestructionQueue() {
     // Erase the elements from the returned iterator to the end.
     // unique_ptr's destructor handles deleting the Entity object.
     if (removalIt != m_entities.end()) {
-        // Log::Info("Erasing " + std::to_string(std::distance(removalIt, m_entities.end())) + " entities from vector.");
+        Log::Info("Erasing " + std::to_string(std::distance(removalIt, m_entities.end())) + " entities from vector.");
         m_entities.erase(removalIt, m_entities.end());
     }
 
@@ -364,18 +312,7 @@ void EntityManager::processDestructionQueue() {
 
 // --- Query Method Implementations ---
 
-std::vector<Entity*> EntityManager::getActiveEntities() const {
-    if (!m_isInitialized) return {};
-    std::vector<Entity*> activeList;
-    activeList.reserve(m_entities.size()); // Avoid reallocations
-    for (const auto& entityPtr : m_entities) {
-        // Ensure the pointer itself is valid and the entity is active
-        if (entityPtr && entityPtr->isActive()) {
-            activeList.push_back(entityPtr.get());
-        }
-    }
-    return activeList;
-}
+
 
 std::vector<Entity*> EntityManager::findEntitiesInRadius(
     const Vec2& center,
@@ -384,12 +321,12 @@ std::vector<Entity*> EntityManager::findEntitiesInRadius(
 {
     if (!m_isInitialized || radius < 0.0f) return {};
 
-    std::vector<Entity*> foundList;
     // Optimization: Use squared radius to avoid sqrt calculation in the loop
     float radiusSq = radius * radius;
 
     // O(N) iteration. For large numbers of entities, consider spatial partitioning
     // (e.g., Quadtree, Spatial Hash Grid) to reduce the number of entities checked.
+    std::vector<Entity*> foundList;
     for (const auto& entityPtr : m_entities) {
         if (entityPtr && entityPtr->isActive()) {   
             // Calculate squared distance from entity center to query center
@@ -410,5 +347,14 @@ std::vector<Entity*> EntityManager::findEntitiesInRadius(
     return foundList;
 }
 
+Player* EntityManager::getPlayer() {
+    // Simple implementation: find the first player entity
+    for (const auto& entityPtr : m_entities) {
+        if (entityPtr && entityPtr->getType() == EntityType::PLAYER) {
+            return static_cast<Player*>(entityPtr.get());
+        }
+    }
+    return nullptr;
+}
 
 } // namespace TuxArena

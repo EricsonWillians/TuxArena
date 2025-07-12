@@ -34,6 +34,7 @@ class EntityManager;
 class NetworkClient;
 class NetworkServer;
 class ModManager;
+class ParticleManager;
 // class PhysicsWorld; // If using a dedicated physics engine
 // class BitStream; // Forward declare bitstream class if used for networking
 
@@ -55,18 +56,20 @@ enum class EntityType {
 
 // Context structure passed to entity update methods
 // Provides access to relevant game systems and frame data
-struct EntityContext {
-    float deltaTime = 0.0f;        // Time elapsed since last frame
-    bool isServer = false;         // Is this update running on the server?
-    InputManager* inputManager = nullptr; // Client only: provides input state
-    MapManager* mapManager = nullptr;     // Access to map collision/data
-    EntityManager* entityManager = nullptr; // To interact with other entities (spawn, query)
-    ModManager* modManager = nullptr;     // Access to modding API/hooks
-    NetworkClient* networkClient = nullptr; // Client only: network state/send interface
-    NetworkServer* networkServer = nullptr; // Server only: network state/send interface
-    // PhysicsWorld* physicsWorld = nullptr; // Physics simulation interface
-    // Add other global state or systems as needed
-};
+    struct EntityContext {
+        float deltaTime;
+        bool isServer;
+        InputManager* inputManager;
+        MapManager* mapManager;
+        EntityManager* entityManager;
+        ModManager* modManager;
+        NetworkClient* networkClient;
+        NetworkServer* networkServer;
+        ParticleManager* particleManager;
+        Renderer* renderer;
+        std::string playerTexturePath;
+        std::string playerCharacterId;
+    };
 
 
 // --- Base Entity Class ---
@@ -96,13 +99,13 @@ public:
      * @brief Updates the entity's state (movement, logic, AI, etc.).
      * @param context Provides delta time and access to game systems.
      */
-    virtual void update(const EntityContext& context) = 0; // Pure virtual
+    virtual void update(const EntityContext& context);
 
     /**
      * @brief Renders the entity using the provided renderer.
      * @param renderer The rendering interface.
      */
-    virtual void render(Renderer& renderer) = 0; // Pure virtual
+    virtual void render(Renderer& renderer);
 
 
     // --- Optional Lifecycle / Event Methods ---
@@ -119,19 +122,7 @@ public:
      */
     virtual void onDestroy(const EntityContext& context) {};
 
-    /**
-     * @brief Serializes the entity's essential state for network transmission.
-     * @param stream The output bitstream to write state into.
-     * @param isInitialState Is this the full initial state or a delta update?
-     */
-    // virtual void serializeState(BitStream& stream, bool isInitialState) const {}
-
-    /**
-     * @brief Deserializes network state and applies it to the entity.
-     * @param stream The input bitstream to read state from.
-     * @param timestamp The server timestamp associated with this state.
-     */
-    // virtual void deserializeState(BitStream& stream, double timestamp) {}
+    virtual void takeDamage(float damage, uint32_t instigatorId) {};
 
 
     // --- Accessors ---

@@ -1,0 +1,15 @@
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/imgui.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/TuxArena.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/edit_cache.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/rebuild_cache.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/list_install_components.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/install.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/install/local.dir
+/home/ericsonwillians/workspace/TuxArena/build/CMakeFiles/install/strip.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/tmxlite.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/edit_cache.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/rebuild_cache.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/list_install_components.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/install.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/install/local.dir
+/home/ericsonwillians/workspace/TuxArena/build/_tmxlite_build/CMakeFiles/install/strip.dir

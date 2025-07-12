@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(test_sdl3net)
+find_package(SDL3 REQUIRED)
+add_executable(test_sdl3net test_sdl3net.cpp)
+target_link_libraries(test_sdl3net SDL3::SDL3)

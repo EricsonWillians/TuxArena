@@ -5,9 +5,11 @@
 #include <stdexcept> // For std::stoi exception
 #include <algorithm> // For std::find
 
-#include "SDL3/SDL.h"
-#include "SDL3/SDL_main.h" // Ensures cross-platform entry point consistency
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_main.h" // Ensures cross-platform entry point consistency
+#include "SDL2/SDL_net.h" // For SDLNet_Init, SDLNet_Quit, SDLNet_GetError
 #include "TuxArena/Game.h"
+#include "TuxArena/Log.h"
 
 // Helper function to parse command-line arguments
 AppConfig parseArguments(int argc, char* argv[]) {
@@ -15,11 +17,12 @@ AppConfig parseArguments(int argc, char* argv[]) {
     std::vector<std::string> args(argv + 1, argv + argc);
     bool connectArgUsed = false;
 
-    std::cout << "TuxArena Starting..." << std::endl;
+    TuxArena::Log::Info("TuxArena Starting...");
 
     for (size_t i = 0; i < args.size(); ++i) {
         if (args[i] == "--server") {
             config.isServer = true;
+            connectArgUsed = true; // Prevent client mode from being auto-selected
         } else if (args[i] == "--connect" && i + 1 < args.size()) {
             config.isServer = false; // Explicitly client if connecting
             config.serverIp = args[++i];
@@ -28,14 +31,14 @@ AppConfig parseArguments(int argc, char* argv[]) {
             try {
                 config.serverPort = std::stoi(args[++i]);
                 if (config.serverPort <= 0 || config.serverPort > 65535) {
-                     std::cerr << "Warning: Invalid port number '" << args[i] << "'. Must be between 1 and 65535. Using default " << config.serverPort << std::endl;
+                     TuxArena::Log::Warning("Invalid port number '" + args[i] + "'. Must be between 1 and 65535. Using default " + std::to_string(config.serverPort));
                      // Revert to default or handle appropriately
                      // config.serverPort = 12345; // Reverting to default example
                 }
             } catch (const std::invalid_argument& e) {
-                std::cerr << "Warning: Invalid port number format '" << args[i] << "'. Using default " << config.serverPort << std::endl;
+                TuxArena::Log::Warning("Invalid port number format '" + args[i] + "'. Using default " + std::to_string(config.serverPort));
             } catch (const std::out_of_range& e) {
-                 std::cerr << "Warning: Port number '" << args[i] << "' out of range. Using default " << config.serverPort << std::endl;
+                 TuxArena::Log::Warning("Port number '" + args[i] + "' out of range. Using default " + std::to_string(config.serverPort));
             }
         } else if (args[i] == "--map" && i + 1 < args.size()) {
             config.mapName = args[++i];
@@ -60,7 +63,7 @@ AppConfig parseArguments(int argc, char* argv[]) {
             std::cout << "  --help, -h       Show this help message.\n";
             exit(0); // Exit after showing help
         } else {
-            std::cerr << "Warning: Unknown argument '" << args[i] << "'" << std::endl;
+            TuxArena::Log::Warning("Unknown argument '" + args[i] + "'");
         }
     }
 
@@ -68,11 +71,11 @@ AppConfig parseArguments(int argc, char* argv[]) {
     if (!config.isServer && !connectArgUsed) {
         config.isServer = false; // Default to client mode
         config.serverIp = "127.0.0.1"; // Default connection target
-        std::cout << "No mode specified, defaulting to client connecting to " << config.serverIp << ":" << config.serverPort << std::endl;
+        TuxArena::Log::Info("No mode specified, defaulting to client connecting to " + config.serverIp + ":" + std::to_string(config.serverPort));
     } else if (config.isServer) {
-        std::cout << "Mode: Server | Port: " << config.serverPort << " | Map: " << config.mapName << std::endl;
+        TuxArena::Log::Info("Mode: Server | Port: " + std::to_string(config.serverPort) + " | Map: " + config.mapName);
     } else { // Client mode specified via --connect
-        std::cout << "Mode: Client | Connecting to: " << config.serverIp << ":" << config.serverPort << std::endl;
+        TuxArena::Log::Info("Mode: Client | Connecting to: " + config.serverIp + ":" + std::to_string(config.serverPort));
     }
 
     return config;
@@ -88,32 +91,34 @@ int main(int argc, char* argv[]) {
     Uint32 sdl_init_flags = SDL_INIT_EVENTS;
     if (!config.isServer) {
         // Only initialize video, audio, gamepad for the client
-        sdl_init_flags |= SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD;
+        sdl_init_flags |= SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK;
     } else {
         // Server might only need timer/events
-        sdl_init_flags |= SDL_INIT_TIMER; // Ensure timer subsystem is available
+        // SDL_INIT_TIMER is deprecated in SDL3, use SDL_INIT_EVENTS for basic event loop
+        // or SDL_INIT_NOPARACHUTE for timer functionality if needed without other subsystems.
+        // For a server, SDL_INIT_EVENTS is usually sufficient.
     }
 
     if (SDL_Init(sdl_init_flags) < 0) {
-        std::cerr << "FATAL ERROR: SDL could not initialize! SDL_Error: " << SDL_GetError() << std::endl;
+        TuxArena::Log::Error("FATAL ERROR: SDL could not initialize! SDL_Error: " + std::string(SDL_GetError()));
         return 1;
     }
-    std::cout << "SDL Initialized successfully." << std::endl;
+    TuxArena::Log::Info("SDL Initialized successfully.");
 
     // Initialize SDL_net globally (required before using any SDL_net functions)
     // It's safe to call even if only client or server uses it.
     if (SDLNet_Init() < 0) {
-         std::cerr << "FATAL ERROR: SDLNet could not initialize! SDLNet_Error: " << SDLNet_GetError() << std::endl;
+         TuxArena::Log::Error("FATAL ERROR: SDL_net could not initialize! SDL_GetError: " + std::string(SDL_GetError()));
          SDL_Quit();
          return 1;
     }
-     std::cout << "SDL_net Initialized successfully." << std::endl;
+    TuxArena::Log::Info("SDL_net Initialized successfully.");
 
 
     // 3. Create and Initialize Game Instance
     TuxArena::Game game;
     if (!game.init(config)) {
-        std::cerr << "FATAL ERROR: Failed to initialize game!" << std::endl;
+        TuxArena::Log::Error("FATAL ERROR: Failed to initialize game!");
         SDLNet_Quit();
         SDL_Quit();
         return 1;
@@ -123,14 +128,14 @@ int main(int argc, char* argv[]) {
     try {
         game.run();
     } catch (const std::exception& e) {
-        std::cerr << "FATAL ERROR: Unhandled exception during game loop: " << e.what() << std::endl;
+        TuxArena::Log::Error("FATAL ERROR: Unhandled exception during game loop: " + std::string(e.what()));
         // Perform emergency shutdown if possible
         game.shutdown();
         SDLNet_Quit();
         SDL_Quit();
         return 1;
     } catch (...) {
-         std::cerr << "FATAL ERROR: Unknown unhandled exception during game loop." << std::endl;
+         TuxArena::Log::Error("FATAL ERROR: Unknown unhandled exception during game loop.");
          game.shutdown();
          SDLNet_Quit();
          SDL_Quit();
@@ -139,13 +144,13 @@ int main(int argc, char* argv[]) {
 
 
     // 5. Cleanup
-    std::cout << "Initiating shutdown..." << std::endl;
+    TuxArena::Log::Info("Initiating shutdown...");
     game.shutdown(); // Game object handles its own component cleanup
 
     SDLNet_Quit(); // Shutdown SDL_net
     SDL_Quit();    // Shutdown SDL subsystems
-    std::cout << "SDL and subsystems shut down." << std::endl;
-    std::cout << "TuxArena exited gracefully." << std::endl;
+    TuxArena::Log::Info("SDL and subsystems shut down.");
+    TuxArena::Log::Info("TuxArena exited gracefully.");
 
     return 0;
 }

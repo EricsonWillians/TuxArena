@@ -1,0 +1,8 @@
+{
+    "id": "tux",
+    "name": "Tux (Modded)",
+    "texturePath": "assets/characters/tux.png",
+    "health": 120.0,
+    "speed": 220.0,
+    "specialAbility": "Ice Breath"
+}

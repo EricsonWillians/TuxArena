@@ -1,0 +1,373 @@
+[2025-07-05 23:20:50] [INFO] TuxArena Starting...
+[2025-07-05 23:20:50] [INFO] Mode: Client | Connecting to: 127.0.0.1:12345
+[2025-07-05 23:20:50] [INFO] SDL Initialized successfully.
+[2025-07-05 23:20:50] [INFO] SDL_net Initialized successfully.
+[2025-07-05 23:20:50] [INFO] Game instance created.
+[2025-07-05 23:20:50] [INFO] Initializing Game systems...
+[2025-07-05 23:20:50] [INFO] Mode: Client
+[2025-07-05 23:20:50] [INFO] Initializing ModManager...
+[2025-07-05 23:20:50] [INFO] ModManager instance created.
+[2025-07-05 23:20:50] [INFO] ModManager initialized with directory: mods
+[2025-07-05 23:20:50] [INFO] ModManager: Triggering OnInit hooks.
+[2025-07-05 23:20:50] [INFO] Initializing Renderer...
+[2025-07-05 23:20:50] [INFO] SDL_image initialized successfully.
+[2025-07-05 23:20:50] [INFO] SDL_ttf initialized successfully.
+[2025-07-05 23:20:50] [INFO] SDL Window created successfully.
+[2025-07-05 23:20:50] [INFO] VSync enabled for renderer.
+[2025-07-05 23:20:51] [INFO] SDL Renderer created successfully.
+[2025-07-05 23:20:51] [INFO] Renderer initialization complete.
+[2025-07-05 23:20:51] [INFO] Initializing ParticleManager...
+[2025-07-05 23:20:51] [INFO] Initializing InputManager...
+[2025-07-05 23:20:51] [INFO] Initializing InputManager...
+[2025-07-05 23:20:51] [INFO] Loading default input bindings...
+INFO: InputManager: Gamepad Added (ID: 0, Name: PS5 Controller)
+[2025-07-05 23:20:51] [INFO] InputManager initialized. Gamepad detected.
+[2025-07-05 23:20:51] [INFO] Initializing CharacterManager...
+[2025-07-05 23:20:51] [INFO] CharacterManager created.
+[2025-07-05 23:20:51] [INFO] CharacterManager: Loading characters from: assets/characters
+[2025-07-05 23:20:51] [INFO] Loaded character: svelte from assets/characters/svelte.png
+[2025-07-05 23:20:51] [INFO] Loaded character: tux from assets/characters/tux.png
+[2025-07-05 23:20:51] [INFO] Loaded character: C from assets/characters/C.png
+[2025-07-05 23:20:51] [INFO] Loaded character: oldschool_python from assets/characters/oldschool_python.png
+[2025-07-05 23:20:51] [INFO] Loaded character: LISP from assets/characters/LISP.png
+[2025-07-05 23:20:51] [INFO] Loaded character: PHP from assets/characters/PHP.png
+[2025-07-05 23:20:51] [INFO] Loaded character: python from assets/characters/python.png
+[2025-07-05 23:20:51] [INFO] Loaded character: gnu from assets/characters/gnu.png
+[2025-07-05 23:20:51] [INFO] Loaded character: gimp from assets/characters/gimp.png
+[2025-07-05 23:20:51] [INFO] Loaded character: blender from assets/characters/blender.png
+[2025-07-05 23:20:51] [INFO] Loaded character: C++ from assets/characters/C++.png
+[2025-07-05 23:20:51] [INFO] Loaded character: inkscape from assets/characters/inkscape.png
+[2025-07-05 23:20:51] [INFO] Loaded character: rust from assets/characters/rust.png
+[2025-07-05 23:20:51] [INFO] Loaded character: docker from assets/characters/docker.png
+[2025-07-05 23:20:51] [INFO] CharacterManager: Selected initial character: svelte
+[2025-07-05 23:20:51] [INFO] CharacterManager initialized successfully with 14 characters.
+[2025-07-05 23:20:51] [INFO] Initializing MapManager...
+[2025-07-05 23:20:51] [INFO] MapManager created.
+[2025-07-05 23:20:51] [INFO] Attempting to load map from: /home/ericsonwillians/workspace/TuxArena/maps/arena1.tmx
+[2025-07-05 23:20:51] [INFO] Loaded tileset: /home/ericsonwillians/workspace/TuxArena/assets/tilesets/topdown_tileset.png (First GID: 1)
+[2025-07-05 23:20:51] [INFO]   - Found Tile Layer: ground (Data used by Renderer)
+[2025-07-05 23:20:51] [INFO] Map '/home/ericsonwillians/workspace/TuxArena/maps/arena1.tmx' loaded successfully. Dimensions: 32x24 tiles, 16x16 tile size.
+[2025-07-05 23:20:51] [INFO] Map '/home/ericsonwillians/workspace/TuxArena/maps/arena1.tmx' loaded.
+[2025-07-05 23:20:51] [INFO] Initializing EntityManager...
+[2025-07-05 23:20:51] [INFO] EntityManager created.
+[2025-07-05 23:20:51] [INFO] Initializing EntityManager...
+[2025-07-05 23:20:51] [INFO] EntityManager initialized successfully.
+[2025-07-05 23:20:51] [INFO] Initializing NetworkClient...
+[2025-07-05 23:20:51] [INFO] Initializing NetworkClient...
+[2025-07-05 23:20:51] [INFO] NetworkClient initialized successfully.
+[2025-07-05 23:20:51] [INFO] Attempting connection to 127.0.0.1:12345...
+[2025-07-05 23:20:51] [INFO] Attempting to connect to 127.0.0.1:12345 as 'Player'
+[2025-07-05 23:20:51] [INFO] CONNECT_REQUEST sent. Waiting for server response...
+[2025-07-05 23:20:51] [INFO] ModManager: Triggering OnGameInit hooks.
+[2025-07-05 23:20:51] [INFO] Game initialization successful. Game state: 2
+[2025-07-05 23:20:51] [INFO] Starting main game loop...
+[2025-07-05 23:20:51] [INFO] Received WELCOME from server.
+[2025-07-05 23:20:51] [INFO] Connection established! Client ID: 1, Server Map: maps/arena1.tmx
+[2025-07-05 23:20:51] [INFO] Loading map specified by server: maps/arena1.tmx
+[2025-07-05 23:20:51] [INFO] Unloading map: /home/ericsonwillians/workspace/TuxArena/maps/arena1.tmx
+[2025-07-05 23:20:51] [INFO] Attempting to load map from: maps/arena1.tmx
+[2025-07-05 23:20:51] [INFO] Loaded tileset: assets/tilesets/topdown_tileset.png (First GID: 1)
+[2025-07-05 23:20:51] [INFO]   - Found Tile Layer: ground (Data used by Renderer)
+[2025-07-05 23:20:51] [INFO] Map 'maps/arena1.tmx' loaded successfully. Dimensions: 32x24 tiles, 16x16 tile size.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Network client connected, transitioning game state to PLAYING.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:51] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:52] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:53] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:54] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:55] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Game::networkUpdateSend: Condition met. Attempting to send updates.
+[2025-07-05 23:20:56] [INFO] Disconnecting from server...
+[2025-07-05 23:20:56] [INFO] Sent DISCONNECT message.
+[2025-07-05 23:22:09] [INFO] Exited main game loop.
+[2025-07-05 23:22:09] [INFO] Initiating shutdown...
+[2025-07-05 23:22:09] [INFO] Shutting down Game systems...
+[2025-07-05 23:22:09] [INFO] Triggering ModManager OnShutdown...
+[2025-07-05 23:22:09] [INFO] ModManager: Triggering OnShutdown hooks.
+[2025-07-05 23:22:09] [INFO] Shutting down NetworkClient...
+[2025-07-05 23:22:09] [INFO] Shutting down NetworkClient...
+[2025-07-05 23:22:09] [INFO] Client socket closed.
+[2025-07-05 23:22:09] [INFO] NetworkClient shutdown complete.
+[2025-07-05 23:22:09] [INFO] Shutting down EntityManager...
+[2025-07-05 23:22:09] [INFO] Shutting down EntityManager...
+[2025-07-05 23:22:09] [INFO] EntityManager shutdown complete.
+[2025-07-05 23:22:09] [INFO] EntityManager destroyed.
+[2025-07-05 23:22:09] [INFO] Shutting down MapManager...
+[2025-07-05 23:22:09] [INFO] Unloading map: maps/arena1.tmx
+[2025-07-05 23:22:09] [INFO] MapManager destroyed.
+[2025-07-05 23:22:09] [INFO] Shutting down InputManager...
+[2025-07-05 23:22:09] [INFO] Shutting down InputManager...
+[2025-07-05 23:22:09] [INFO] InputManager shut down.
+[2025-07-05 23:22:09] [INFO] Shutting down Renderer...
+[2025-07-05 23:22:09] [INFO] Shutting down Renderer...
+[2025-07-05 23:22:09] [INFO] Clearing texture cache (15 items)...
+[2025-07-05 23:22:09] [INFO] Clearing font cache (2 items)...
+[2025-07-05 23:22:09] [INFO] Destroying SDL Renderer...
+[2025-07-05 23:22:09] [INFO] Destroying SDL Window...
+[2025-07-05 23:22:09] [INFO] Shutting down SDL_ttf...
+[2025-07-05 23:22:09] [INFO] Shutting down SDL_image...
+[2025-07-05 23:22:09] [INFO] Renderer shutdown complete.
+[2025-07-05 23:22:09] [INFO] Shutting down ModManager...
+[2025-07-05 23:22:09] [INFO] ModManager shutting down.
+[2025-07-05 23:22:09] [INFO] ModManager instance destroyed.
+[2025-07-05 23:22:09] [INFO] Game systems shutdown complete.
+[2025-07-05 23:22:09] [INFO] SDL and subsystems shut down.
+[2025-07-05 23:22:09] [INFO] TuxArena exited gracefully.
+[2025-07-05 23:22:09] [INFO] Game instance destroyed.
+[2025-07-05 23:22:09] [INFO] CharacterManager destroyed.

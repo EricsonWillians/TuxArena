@@ -1,81 +1,62 @@
-// include/TuxArena/Network.h
-#pragma once
+#ifndef TUXARENA_NETWORK_H
+#define TUXARENA_NETWORK_H
 
-#include <cstdint> // For fixed-width integers like uint16_t, uint8_t
-#include <limits>  // For numeric_limits
+#include <cstdint>
 
 namespace TuxArena {
+
 namespace Network {
 
-// --- Constants ---
-constexpr uint16_t DEFAULT_PORT = 12345; // Default UDP port used if none specified
-constexpr uint32_t PROTOCOL_ID = 0x54555841; // "TUXA" - Simple protocol identifier
-constexpr uint16_t PROTOCOL_VERSION = 1;     // Current protocol version
-constexpr int MAX_PACKET_SIZE = 1400;        // Max bytes for UDP payload (conservative)
-constexpr int MAX_CLIENTS = 8;               // Max clients supported by server (example)
-constexpr float CONNECTION_TIMEOUT = 10.0f;  // Seconds before considering a client disconnected
-constexpr float CLIENT_HEARTBEAT_RATE = 1.0f; // Seconds between client sending keep-alive/input
+// Protocol Constants
+const uint32_t PROTOCOL_ID = 0x54584101; // 'TXA' + 0x01 (TuxArena Protocol ID)
+const uint16_t PROTOCOL_VERSION = 1;     // Current protocol version
 
-// --- Message Types ---
-// The first byte of every packet identifies its type
+// Network Configuration
+const int MAX_PACKET_SIZE = 512; // Maximum size of a UDP packet in bytes
+const double CONNECTION_TIMEOUT = 5.0; // Seconds before a connection is considered timed out
+const double CLIENT_CONNECT_RETRY_INTERVAL = 1.0; // Seconds between connection request retries
+
+// Message Types (from client to server and server to client)
 enum class MessageType : uint8_t {
-    // --- Client -> Server ---
-    CONNECT_REQUEST = 1, // Client wants to connect [ProtocolID, Version, PlayerName?]
-    DISCONNECT = 2,      // Client gracefully disconnecting
-    INPUT = 3,           // Client sending input state [SequenceNr, InputState]
-    PONG = 4,            // Client reply to server PING
-    ACK = 5,             // Client acknowledging reliable message receipt
+    // Connection Management
+    CONNECT_REQUEST = 1,  // Client requests to connect
+    WELCOME = 2,          // Server welcomes client, assigns ID
+    REJECT = 3,           // Server rejects connection
+    DISCONNECT = 4,       // Client or server initiates disconnect
+    PING = 5,             // Used for RTT calculation and keep-alive
+    PONG = 6,             // Response to PING
 
-    // --- Server -> Client ---
-    WELCOME = 101,       // Server acknowledges connection [ClientID, MapName, ServerInfo?]
-    REJECT = 102,        // Server rejects connection [ReasonCode]
-    STATE_UPDATE = 103,  // Server broadcasting game state snapshot [Timestamp, EntityStates...]
-    SPAWN_ENTITY = 104,  // Server commands client to spawn an entity [EntityID, Type, Pos, Vel...]
-    DESTROY_ENTITY = 105,// Server commands client to destroy an entity [EntityID]
-    PING = 106,          // Server checking client connection
-    RELIABLE_MSG = 107,  // Wrapper for messages requiring acknowledgement
-    SET_MAP = 108,       // Command client to load a specific map
+    // Game State Synchronization (Server to Client)
+    STATE_UPDATE = 10,    // Full or partial game state snapshot
+    SPAWN_ENTITY = 11,    // Server tells client to spawn an entity
+    DESTROY_ENTITY = 12,   // Server tells client to destroy an entity
+    SET_MAP = 13,         // Server tells client to load a specific map
 
-    // Add more as needed (chat, specific game events, etc.)
+    // Client Input (Client to Server)
+    INPUT = 20,           // Client sends input state
+
+    // Chat/Messaging
+    CHAT_MESSAGE = 30,    // Text chat message
+
+    // Modding/Custom Data
+    MOD_DATA = 40,        // Generic message for mod-specific data
+
+    // Error/Debug
+    ERROR_MESSAGE = 99,   // Generic error message
 };
 
-// --- Basic Data Structures (Examples - Refine as needed) ---
-
-// Example: Structure for player input sent from client to server
-// Needs proper serialization/deserialization
-struct PlayerInputState {
-    uint32_t sequenceNumber; // To handle out-of-order/dropped packets
-    // Input flags (use bitmask or individual bools)
-    bool moveForward : 1;
-    bool moveBackward : 1;
-    bool moveLeft : 1;
-    bool moveRight : 1;
-    bool shoot : 1;
-    // Add other boolean actions...
-    uint8_t reserved : 3; // Padding bits
-    // Aiming direction (send periodically or when changed significantly)
-    float aimAngleDegrees; // Or send aim vector components (aimX, aimY)
-    // Add weapon switch commands, etc.
-
-    // TODO: Implement serialize/deserialize methods for network transport
-};
-
-// Example: Reason for connection rejection
+// Reject Reasons
 enum class RejectReason : uint8_t {
-    SERVER_FULL,
-    INVALID_VERSION,
-    INVALID_PROTOCOL,
-    BANNED,
-    // Add others
+    NONE = 0,
+    INVALID_PROTOCOL = 1, // Protocol ID or version mismatch
+    SERVER_FULL = 2,      // No more player slots available
+    BANNED = 3,           // Client is banned
+    INVALID_NAME = 4,     // Player name is invalid or already taken
+    UNKNOWN_ERROR = 5,
 };
-
-
-// --- Helper Functions (Optional) ---
-
-// inline void serialize_uint32(uint8_t* buffer, uint32_t value) { ... }
-// inline uint32_t deserialize_uint32(const uint8_t* buffer) { ... }
-// Implement basic network byte order conversions (htonl, ntohl equivalent) if needed
-
 
 } // namespace Network
+
 } // namespace TuxArena
+
+#endif // TUXARENA_NETWORK_H
